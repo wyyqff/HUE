@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import logoSvg from '@/assets/logo.svg'
+
 import { Key, Lock, Phone, UserPlus } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from '@/utils/feedback'
@@ -83,7 +83,7 @@ const navigateToLogin = () => {
 <template>
   <SubPageShell title="创建账号" subtitle="注册后即可发布与接单" back-to="/login" max-width="sm">
     <template #icon>
-      <img :src="logoSvg" alt="Nowl" class="w-12 h-12" />
+      <span class="school-mark" role="img" aria-label="河北工程大学校徽"></span>
     </template>
 
     <form @submit.prevent="handleRegister" class="space-y-4">

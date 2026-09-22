@@ -43,6 +43,7 @@ const adminRoutes: RouteRecordRaw[] = adminRouteConfigs.map((route) => ({
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
+  scrollBehavior(to) { return to.hash ? { el: to.hash, top: 90, behavior: 'smooth' } : { top: 0 } },
   routes: [
     {
       path: '/',
@@ -98,7 +99,7 @@ const router = createRouter({
       path: '/chat',
       name: 'chat',
       component: () => import('../views/ChatView.vue'),
-      meta: { title: 'Nowl AI', requiresAuth: true },
+      meta: { title: '校园助手', requiresAuth: true },
     },
     {
       path: '/chat/user/:id',
@@ -257,7 +258,7 @@ const router = createRouter({
 // 路由守卫
 router.beforeEach(async (to, from, next) => {
   // 固定站点标题，避免按路由动态变化
-  document.title = 'Nowl'
+  document.title = '河北工程大学校园服务'
 
   // 检查是否需要登录
   if (to.meta.requiresAuth) {

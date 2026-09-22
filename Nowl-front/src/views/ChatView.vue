@@ -79,13 +79,13 @@ const loadChatHistory = async () => {
       aiAssistantMsgs.value = historyList.map(mapHistoryMessage)
     } else {
       // 没有历史记录时显示欢迎消息
-      aiAssistantMsgs.value = [createModelMessage('你好！我是 Nowl AI。你可以问我商品检索、推荐和平台使用问题~')]
+      aiAssistantMsgs.value = [createModelMessage('你好！我是 校园助手。你可以问我商品检索、推荐和平台使用问题~')]
     }
     await nextTick()
     scrollToBottom()
   } catch (e) {
     console.error('加载历史记录失败', e)
-    aiAssistantMsgs.value = [createModelMessage('你好！我是 Nowl AI。你可以问我商品检索、推荐和平台使用问题~')]
+    aiAssistantMsgs.value = [createModelMessage('你好！我是 校园助手。你可以问我商品检索、推荐和平台使用问题~')]
   } finally {
     isLoadingHistory.value = false
   }
@@ -186,7 +186,7 @@ const handleChat = async () => {
     aiAssistantMsgs.value = [...newMsgs, buildModelMessageFromResponse(res)]
   } catch (err) {
     console.error(err)
-    aiAssistantMsgs.value = [...newMsgs, createModelMessage('哎呀，Nowl AI 有点忙，请稍后再试~')]
+    aiAssistantMsgs.value = [...newMsgs, createModelMessage('哎呀，校园助手 有点忙，请稍后再试~')]
   } finally {
     isAiLoading.value = false
     setTimeout(scrollToBottom, 100)
@@ -274,7 +274,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <SubPageShell title="Nowl AI" subtitle="商品问答与平台助手" max-width="lg" :use-card="false" :show-back="false">
+  <SubPageShell title="校园助手" subtitle="商品问答与平台助手" max-width="lg" :use-card="false" :show-back="false">
     <template #icon>
       <Sparkles class="text-white w-8 h-8" stroke-width="2.5" />
     </template>
@@ -287,7 +287,7 @@ onMounted(() => {
             <Sparkles :size="20" />
           </div>
           <div>
-            <h3 class="font-bold text-slate-800">Nowl AI</h3>
+            <h3 class="font-bold text-slate-800">校园助手</h3>
             <p class="text-[10px] text-green-500 font-bold uppercase tracking-wider">多模态 AI • 在线</p>
           </div>
         </div>

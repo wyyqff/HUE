@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import CampusGuide from '@/components/CampusGuide.vue'
 import { useRouter } from 'vue-router'
-import logoSvg from '@/assets/logo.svg'
+
 import { getHomeRecommend } from '@/api/modules/recommend'
 import { useUserStore } from '@/stores/user'
+import { DEFAULT_CAMPUS } from '@/config/campus'
 import type { RecommendItemVO } from '@/types'
 import {
   ArrowRight,
@@ -172,7 +174,7 @@ const reasons = [
   },
   {
     title: '校园跑腿',
-    desc: '代取快递、食堂带饭、打印资料，Nowl同学随时待命，响应更快。',
+    desc: '代取快递、食堂带饭、打印资料，河工程同学随时待命，响应更快。',
     icon: Bike,
   },
   {
@@ -182,7 +184,7 @@ const reasons = [
   },
 ]
 
-const campusName = computed(() => userStore.currentCampus?.name || '未登录')
+const campusName = computed(() => userStore.currentCampus?.name || DEFAULT_CAMPUS.name)
 
 const topRecommendGoods = computed(() => recommendGoods.value.slice(0, RECOMMEND_ROW_SIZE))
 const bottomRecommendGoods = computed(() => recommendGoods.value.slice(RECOMMEND_ROW_SIZE, RECOMMEND_LIMIT))
@@ -269,18 +271,18 @@ watch(
       <div class="hero-text">
         <div class="campus-tag" >
           <MapPin :size="14" />
-          当前定位：{{ campusName }}（已开启校区隔离）
+          {{ campusName }} · 同校共享
         </div>
         <h1>
-          Night owls<br />
-          <span>你需要的，都在这里</span>
+          河北工程大学<br />
+          <span>让校园生活，更近一点</span>
         </h1>
         <p>
-          “Nowl”是专为校园打造的交易社区，以校园隔离为保障。物品交易与校园跑腿兼具，欢迎加入我们，一起营造美好。
+          崇德尚善 · 精工铸新。在这里发现闲置好物、发布跑腿需求、探索熟悉的校园，与河工程同学分享每一天。
         </p>
         <div class="hero-actions">
           <button type="button" class="hero-btn primary" @click="goToMarket">
-            开启拾光之旅
+            逛逛校园集市
             <ArrowRight :size="16" />
           </button>
           <button type="button" class="hero-btn secondary" @click="goToErrands">
@@ -289,19 +291,16 @@ watch(
         </div>
       </div>
 
-      <div class="hero-visual" aria-hidden="true">
-        <div class="owl-frame">
-          <img :src="logoSvg" alt="" />
-        </div>
-      </div>
+      <div class="hero-visual"><figure class="campus-photo"><img src="/campus/wanxia.jpg" alt="河北工程大学湖畔晚霞与天鹅，7972像素高清校园实景" width="7972" height="3307" fetchpriority="high" decoding="async" /><figcaption><span>HEBEU · CAMPUS MOMENTS</span><strong>湖畔晚霞 · 定格河工程的美好</strong></figcaption></figure></div>
     </section>
+    <CampusGuide />
 
     <section class="recommend-section">
       <div class="recommend-head">
         <h2 class="section-title">校园集市 · 好物推荐</h2>
         <p class="recommend-subtitle">精选 10 件好物推荐</p>
         <p v-if="usingMockRecommend" class="recommend-fallback-tip">
-          推荐接口暂不可用，当前展示示例好物。
+          暂未发布校园好物，以下为体验示例。
         </p>
       </div>
 
@@ -323,7 +322,7 @@ watch(
           <div class="recommend-cover">
             <img v-if="item.image" :src="item.image" :alt="item.title" loading="lazy" />
             <div v-else class="recommend-placeholder">
-              <img :src="logoSvg" alt="" />
+              <span class="school-mark" role="img" aria-label="河北工程大学校徽"></span>
             </div>
             <span class="recommend-type">{{ getRecommendBadge(item.recommendType) }}</span>
           </div>
@@ -332,7 +331,7 @@ watch(
             <p class="recommend-category">{{ item.categoryName || '校园精选好物' }}</p>
             <div class="recommend-meta">
               <span class="price">¥{{ formatPrice(item.price) }}</span>
-              <span class="seller">{{ item.sellerName || 'Nowl同学' }}</span>
+              <span class="seller">{{ item.sellerName || '河工程同学' }}</span>
             </div>
           </div>
         </article>
@@ -348,7 +347,7 @@ watch(
           <div class="recommend-cover">
             <img v-if="item.image" :src="item.image" :alt="item.title" loading="lazy" />
             <div v-else class="recommend-placeholder">
-              <img :src="logoSvg" alt="" />
+              <span class="school-mark" role="img" aria-label="河北工程大学校徽"></span>
             </div>
             <span class="recommend-type">{{ getRecommendBadge(item.recommendType) }}</span>
           </div>
@@ -357,7 +356,7 @@ watch(
             <p class="recommend-category">{{ item.categoryName || '校园精选好物' }}</p>
             <div class="recommend-meta">
               <span class="price">¥{{ formatPrice(item.price) }}</span>
-              <span class="seller">{{ item.sellerName || 'Nowl同学' }}</span>
+              <span class="seller">{{ item.sellerName || '河工程同学' }}</span>
             </div>
           </div>
         </article>
@@ -377,7 +376,7 @@ watch(
           <div class="recommend-cover">
             <img v-if="item.image" :src="item.image" :alt="item.title" loading="lazy" />
             <div v-else class="recommend-placeholder">
-              <img :src="logoSvg" alt="" />
+              <span class="school-mark" role="img" aria-label="河北工程大学校徽"></span>
             </div>
             <span class="recommend-type">{{ getRecommendBadge(item.recommendType) }}</span>
           </div>
@@ -386,7 +385,7 @@ watch(
             <p class="recommend-category">{{ item.categoryName || '校园精选好物' }}</p>
             <div class="recommend-meta">
               <span class="price">¥{{ formatPrice(item.price) }}</span>
-              <span class="seller">{{ item.sellerName || 'Nowl同学' }}</span>
+              <span class="seller">{{ item.sellerName || '河工程同学' }}</span>
             </div>
           </div>
         </article>
@@ -402,7 +401,7 @@ watch(
           <div class="recommend-cover">
             <img v-if="item.image" :src="item.image" :alt="item.title" loading="lazy" />
             <div v-else class="recommend-placeholder">
-              <img :src="logoSvg" alt="" />
+              <span class="school-mark" role="img" aria-label="河北工程大学校徽"></span>
             </div>
             <span class="recommend-type">{{ getRecommendBadge(item.recommendType) }}</span>
           </div>
@@ -411,7 +410,7 @@ watch(
             <p class="recommend-category">{{ item.categoryName || '校园精选好物' }}</p>
             <div class="recommend-meta">
               <span class="price">¥{{ formatPrice(item.price) }}</span>
-              <span class="seller">{{ item.sellerName || 'Nowl同学' }}</span>
+              <span class="seller">{{ item.sellerName || '河工程同学' }}</span>
             </div>
           </div>
         </article>
@@ -466,7 +465,7 @@ watch(
     </section>
 
     <section class="why-section">
-      <h2 class="why-title">为什么选择Nowl？</h2>
+      <h2 class="why-title">属于河工程的校园生活</h2>
       <div class="why-grid">
         <article v-for="item in reasons" :key="item.title" class="why-card">
           <div class="why-icon">
@@ -478,9 +477,9 @@ watch(
       </div>
     </section>
 
-    <button type="button" class="assistant-float" @click="openAssistant" aria-label="打开Nowl AI">
+    <button type="button" class="assistant-float" @click="openAssistant" aria-label="打开校园助手">
       <span class="assistant-pulse"></span>
-      <span class="assistant-text"><strong>Nowl AI：</strong>同学，有什么可以帮你的？</span>
+      <span class="assistant-text"><strong>校园助手：</strong>同学，有什么可以帮你的？</span>
     </button>
   </div>
 </template>

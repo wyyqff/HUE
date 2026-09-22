@@ -5,26 +5,26 @@ export default {
     extend: {
       colors: {
         warm: {
-          50: '#FBF8F6',
-          100: '#EFEBE9',
-          200: '#D7CCC8',
-          300: '#BCAAA4',
-          400: '#A1887F',
-          500: '#8D6E63',
-          600: '#6D4C41',
-          700: '#5D4037',
-          800: '#4E342E',
-          900: '#3E2723'
+          50: '#f7f9fc',
+          100: '#edf2f6',
+          200: '#d4dfe8',
+          300: '#aec2d1',
+          400: '#7898b0',
+          500: '#254b68',
+          600: '#21445f',
+          700: '#173b58',
+          800: '#16334c',
+          900: '#183047'
         },
         um: {
-          primary: '#8D6E63',
-          primary600: '#6D4C41',
-          primary100: '#EFEBE9',
-          accent: '#FF7043',
+          primary: '#254b68',
+          primary600: '#21445f',
+          primary100: '#edf2f6',
+          accent: '#a82634',
           cta: '#22c55e',
-          bg: '#FFFBF8',
-          text: '#3E2723',
-          muted: '#8D7B75',
+          bg: '#f7f9fc',
+          text: '#183047',
+          muted: '#63788b',
         }
       },
       fontFamily: {
@@ -32,8 +32,8 @@ export default {
         body: ['"PingFang SC"', '"Microsoft YaHei"', '"Noto Sans SC"', 'sans-serif'],
       },
       boxShadow: {
-        um: '0 4px 12px rgba(62, 39, 35, 0.10)',
-        umSoft: '0 2px 8px rgba(62, 39, 35, 0.08)',
+        um: '0 4px 12px rgba(24, 48, 71, 0.10)',
+        umSoft: '0 2px 8px rgba(24, 48, 71, 0.08)',
       },
       borderRadius: {
         um: '16px',

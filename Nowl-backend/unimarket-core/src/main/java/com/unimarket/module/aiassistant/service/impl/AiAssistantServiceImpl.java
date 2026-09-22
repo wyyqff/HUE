@@ -111,7 +111,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                 .build());
 
         if (decision.getAction() != RiskAction.ALLOW) {
-            throw new BusinessException("当前 Nowl AI 对话行为触发风控策略，请稍后再试");
+            throw new BusinessException("当前 校园助手 对话行为触发风控策略，请稍后再试");
         }
 
         aiChatHistoryService.saveUserMessage(userId, message, imageUrl, decision.getRiskLevel());
@@ -187,7 +187,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
 
     private AiChatResponseVO buildPricingOrAuditUnavailableResponse() {
         AiChatResponseVO response = new AiChatResponseVO();
-        response.setReplyText("Nowl AI 聊天暂不提供估价或审核。请在发布商品页面使用对应能力。");
+        response.setReplyText("校园助手 聊天暂不提供估价或审核。请在发布商品页面使用对应能力。");
         response.setCards(Collections.emptyList());
         response.setIntent(QueryIntent.GENERAL.toCode());
         response.setKeyword(null);

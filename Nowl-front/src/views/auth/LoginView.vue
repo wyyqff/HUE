@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import logoSvg from '@/assets/logo.svg'
+
 import { ArrowRight, Lock, RefreshCw, ShieldCheck, User } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/user'
 import * as userApi from '@/api/modules/user'
@@ -108,9 +108,9 @@ onMounted(() => {
 </script>
 
 <template>
-  <SubPageShell title="欢迎回来" subtitle="使用手机号、密码和图形码登录" back-to="/" max-width="sm">
+  <SubPageShell title="河北工程大学" subtitle="校园服务 · 账号登录" back-to="/" max-width="sm">
     <template #icon>
-      <img :src="logoSvg" alt="Nowl" class="w-12 h-12" />
+      <span class="school-mark" role="img" aria-label="河北工程大学校徽"></span>
     </template>
 
     <form @submit.prevent="handleLogin" class="space-y-4">

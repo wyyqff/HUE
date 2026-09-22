@@ -2,7 +2,6 @@
 import { useAdminDashboard } from './useAdminDashboard'
 
 const {
-  logoSvg,
   Bell,
   ChevronRight,
   Home,
@@ -191,14 +190,14 @@ const {
 } = useAdminDashboard()
 </script>
 <template>
-  <div class="admin-owl min-h-screen flex">
+  <div class="admin-campus min-h-screen flex">
     <!-- Sidebar -->
     <aside
       class="admin-sidebar fixed h-full z-30 transition-all duration-300 ease-in-out"
       :class="sidebarCollapsed ? 'w-20' : 'w-72'"
     >
       <!-- 背景装饰 -->
-      <div class="absolute inset-0 bg-gradient-to-b from-[#4e342e] via-[#5d4037] to-[#3e2723]"></div>
+      <div class="absolute inset-0 bg-gradient-to-b from-[#16334c] via-[#173b58] to-[#183047]"></div>
       <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PHBhdGggZD0iTTM2IDM0djItSDI0di0yaDEyek0zNiAyNHYySDI0di0yaDEyeiIvPjwvZz48L2c+PC9zdmc+')] opacity-50"></div>
 
       <div class="relative flex flex-col h-full text-white">
@@ -206,15 +205,15 @@ const {
         <div class="p-6 flex items-center gap-4 border-b border-white/10">
           <div class="relative">
             <div class="w-12 h-12 bg-gradient-to-br from-amber-400 via-orange-500 to-amber-600 rounded-2xl flex items-center justify-center shadow-lg shadow-amber-500/35 transform hover:scale-105 transition-transform p-2">
-              <img :src="logoSvg" alt="Nowl" class="w-full h-full object-contain drop-shadow-sm" />
+              <span class="school-mark" role="img" aria-label="河北工程大学校徽"></span>
             </div>
             <div class="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-slate-900 animate-pulse"></div>
           </div>
           <div v-if="!sidebarCollapsed" class="flex-1">
             <h1 class="font-bold text-xl tracking-wide bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
-              Nowl Admin
+              河北工程大学
             </h1>
-            <p class="text-xs text-amber-100/80 mt-0.5">猫头鹰管理控制台</p>
+            <p class="text-xs text-amber-100/80 mt-0.5">校园服务管理后台</p>
           </div>
         </div>
 
@@ -999,10 +998,10 @@ const {
 </template>
 
 <style scoped>
-.admin-owl {
+.admin-campus {
   background:
     radial-gradient(circle at 10% 10%, rgba(255, 183, 77, 0.18), transparent 35%),
-    radial-gradient(circle at 85% 20%, rgba(141, 110, 99, 0.16), transparent 32%),
+    radial-gradient(circle at 85% 20%, rgba(37, 75, 104, 0.16), transparent 32%),
     linear-gradient(160deg, #f7f2ef 0%, #efe6df 100%);
 }
 
@@ -1013,13 +1012,13 @@ const {
 .admin-topbar {
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(141, 110, 99, 0.18);
+  border-bottom: 1px solid rgba(37, 75, 104, 0.18);
 }
 
 .admin-content-card {
   background: rgba(255, 255, 255, 0.9);
   border-radius: 22px;
-  border: 1px solid rgba(141, 110, 99, 0.2);
+  border: 1px solid rgba(37, 75, 104, 0.2);
   box-shadow: 0 12px 34px rgba(80, 55, 42, 0.12);
 }
 
@@ -1053,7 +1052,7 @@ const {
 }
 
 :deep(.el-pagination .el-pager li.is-active) {
-  background: linear-gradient(135deg, var(--um-primary), #a1887f);
+  background: linear-gradient(135deg, var(--um-primary), #7898b0);
   color: white;
 }
 
@@ -1068,11 +1067,11 @@ const {
 }
 
 :deep(.el-select .el-input__wrapper:hover) {
-  box-shadow: 0 0 0 1px rgba(141, 110, 99, 0.45);
+  box-shadow: 0 0 0 1px rgba(37, 75, 104, 0.45);
 }
 
 :deep(.el-select .el-input.is-focus .el-input__wrapper) {
-  box-shadow: 0 0 0 2px rgba(141, 110, 99, 0.2);
+  box-shadow: 0 0 0 2px rgba(37, 75, 104, 0.2);
 }
 
 :deep(.el-input__wrapper) {
@@ -1081,11 +1080,11 @@ const {
 }
 
 :deep(.el-input__wrapper:hover) {
-  box-shadow: 0 0 0 1px rgba(141, 110, 99, 0.45);
+  box-shadow: 0 0 0 1px rgba(37, 75, 104, 0.45);
 }
 
 :deep(.el-input.is-focus .el-input__wrapper) {
-  box-shadow: 0 0 0 2px rgba(141, 110, 99, 0.2);
+  box-shadow: 0 0 0 2px rgba(37, 75, 104, 0.2);
 }
 </style>
 

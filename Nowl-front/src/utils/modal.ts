@@ -298,7 +298,7 @@ export function showInfo(message: string, title = '提示'): Promise<boolean> {
 /**
  * AI相关提示弹窗（带渐变效果）
  */
-export function showAiMessage(message: string, title = 'Nowl AI'): Promise<boolean> {
+export function showAiMessage(message: string, title = '校园助手'): Promise<boolean> {
   showToast('ai', message, title)
   return Promise.resolve(true)
 }

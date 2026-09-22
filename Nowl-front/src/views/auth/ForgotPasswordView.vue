@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import logoSvg from '@/assets/logo.svg'
+
 import { ArrowRight, Key, Lock, Phone } from 'lucide-vue-next'
 import * as userApi from '@/api/modules/user'
 import { ElMessage } from '@/utils/feedback'
@@ -78,7 +78,7 @@ const navigateToLogin = () => {
 <template>
   <SubPageShell title="重置密码" subtitle="短信验证后设置新密码" back-to="/login" max-width="sm">
     <template #icon>
-      <img :src="logoSvg" alt="Nowl" class="w-12 h-12" />
+      <span class="school-mark" role="img" aria-label="河北工程大学校徽"></span>
     </template>
 
     <form @submit.prevent="handleResetPassword" class="space-y-4">

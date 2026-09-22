@@ -3,32 +3,32 @@
 @tailwind utilities;
 
 :root {
-  --um-primary: #8D6E63;
-  --um-primary-600: #5D4037;
-  --um-primary-100: #EFEBE9;
-  --um-accent: #FF7043;
+  --um-primary: #254b68;
+  --um-primary-600: #173b58;
+  --um-primary-100: #edf2f6;
+  --um-accent: #a82634;
   --um-cta: #22c55e;
-  --um-bg: #EFEBE9;
-  --um-bg-soft: #F6F1EE;
+  --um-bg: #edf2f6;
+  --um-bg-soft: #f4f7fa;
   --um-surface: #ffffff;
-  --um-surface-2: #FAF7F5;
-  --um-border: rgba(141, 110, 99, 0.24);
-  --um-text: #3E2723;
-  --um-muted: #8D7B75;
-  --um-shadow: 0 4px 12px rgba(62, 39, 35, 0.1);
-  --um-shadow-soft: 0 2px 8px rgba(62, 39, 35, 0.08);
+  --um-surface-2: #f8fafc;
+  --um-border: rgba(37, 75, 104, 0.24);
+  --um-text: #183047;
+  --um-muted: #63788b;
+  --um-shadow: 0 4px 12px rgba(24, 48, 71, 0.1);
+  --um-shadow-soft: 0 2px 8px rgba(24, 48, 71, 0.08);
   --um-radius: 16px;
   --um-radius-md: 14px;
   --um-radius-sm: 10px;
-  --um-gradient: linear-gradient(to bottom right, #FFFFFF, #EFEBE9);
+  --um-gradient: linear-gradient(to bottom right, #FFFFFF, #edf2f6);
   --um-form-padding-y: 0.75rem;
   --um-form-padding-x: 1rem;
   --um-form-prefix-padding-left: 2.75rem;
   --um-form-text-offset-x: 8px;
   --um-header-bg: rgba(255, 255, 255, 0.94);
-  --um-header-border: rgba(141, 110, 99, 0.18);
-  --um-header-shadow: 0 2px 10px rgba(62, 39, 35, 0.08);
-  --um-hover-surface: #fff8f2;
+  --um-header-border: rgba(37, 75, 104, 0.18);
+  --um-header-shadow: 0 2px 10px rgba(24, 48, 71, 0.08);
+  --um-hover-surface: #edf3f8;
   --um-focus-ring: rgba(255, 112, 67, 0.26);
   --um-duration-fast: 0.2s;
   --um-ease-standard: ease;
@@ -120,7 +120,7 @@ select {
   padding: 4px 10px;
   font-size: 11px;
   font-weight: 700;
-  background: rgba(141, 110, 99, 0.12);
+  background: rgba(37, 75, 104, 0.12);
   color: var(--um-primary-600);
 }
 
@@ -150,7 +150,7 @@ select {
 
 .um-btn-ghost {
   background: transparent;
-  border: 1px dashed rgba(141, 110, 99, 0.35);
+  border: 1px dashed rgba(37, 75, 104, 0.35);
   color: var(--um-primary-600);
 }
 
@@ -232,12 +232,12 @@ select {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #EFEBE9;
+  background: #edf2f6;
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #D7CCC8;
+  background: #d4dfe8;
 }
 
 #app {
@@ -252,7 +252,7 @@ select {
 }
 
 .um-theme .el-pagination .el-pager li.is-active {
-  background: #FF7043;
+  background: #a82634;
   color: white;
 }
 
@@ -289,3 +289,14 @@ select {
     scroll-behavior: auto !important;
   }
 }
+
+/* 河北工程大学主题 */
+.school-mark { display:inline-block; width:48px; height:48px; flex-shrink:0; border-radius:50%; background:white url('/campus/crest.png') no-repeat; background-size:370.37% 133.33%; background-position:4% 50%; }
+.logo-title { font-size:21px !important; letter-spacing:1px; }
+.logo-title small { display:block; font-size:10px; letter-spacing:2px; font-weight:500; margin-top:3px; color:#63788b; }
+.nav-logo { background:transparent !important; box-shadow:none !important; }
+.nav-links { gap:22px !important; }
+@media(max-width:1100px){ .nav-links{gap:12px !important;} .logo-title{font-size:17px !important;} }
+@media(max-width:600px){ .logo-title{font-size:15px !important;} .school-mark{width:40px;height:40px;} }
+@media(max-width:1080px){.proto-header-inner .nav-links{flex:0 0 100%;width:100%;justify-content:space-between;overflow:visible;gap:10px !important;padding:5px 0;}.proto-header-inner .nav-item{font-size:13px;}.proto-header-inner .publish-button{font-size:12px;padding:6px 10px;}}
+@media(max-width:720px){.proto-header-inner .logo-title{display:block;}.proto-header-inner .campus-selector{display:none;}.proto-header-inner .user-actions{gap:8px;}.proto-header-inner{gap:8px;}.proto-header-inner .nav-links{gap:7px !important;}.proto-header-inner .nav-item{font-size:12px;}}

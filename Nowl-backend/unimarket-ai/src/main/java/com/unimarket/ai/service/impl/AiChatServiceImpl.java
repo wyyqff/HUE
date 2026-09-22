@@ -46,7 +46,7 @@ public class AiChatServiceImpl implements AiChatService {
     private String model;
 
     private static final String SYSTEM_PROMPT_TEXT = """
-            你叫"Nowl AI"，是UniMarket校园二手交易平台的智能助手。
+            你叫"校园助手"，是河北工程大学校园服务平台的智能助手。
             你的职责是：
             1. 帮助同学解答关于二手交易、跑腿任务、纠纷处理的问题。
             2. 提供商品检索、推荐相关的问答支持。
@@ -61,9 +61,9 @@ public class AiChatServiceImpl implements AiChatService {
             // Spring AI 0.8.1 的 OpenAiChatClient 在请求转换时不会把 Media 带到最终请求里，
             // 图片会在框架层被静默丢弃，因此这里对带图对话单独走兼容 OpenAI 的多模态请求。
             if (imageUrl != null && !imageUrl.isEmpty()) {
-                log.info("Nowl AI收到图片消息: {}", imageUrl);
+                log.info("校园助手收到图片消息: {}", imageUrl);
                 String response = callMultimodalChat(message, imageUrl, historyContext);
-                log.info("Nowl AI回复: {}", response);
+                log.info("校园助手回复: {}", response);
                 return response;
             }
 
@@ -74,14 +74,14 @@ public class AiChatServiceImpl implements AiChatService {
             promptMessages.addAll(historyMessages);
             promptMessages.add(new UserMessage(message));
 
-            log.info("Nowl AI正在思考... (历史记录数: {})", historyMessages.size());
+            log.info("校园助手正在思考... (历史记录数: {})", historyMessages.size());
             String response = chatClient.call(new Prompt(promptMessages)).getResult().getOutput().getContent();
-            log.info("Nowl AI回复: {}", response);
+            log.info("校园助手回复: {}", response);
             return response;
 
         } catch (Exception e) {
             log.error("AI服务调用异常", e);
-            return "抱歉，Nowl AI现在有点忙，请稍后再试~";
+            return "抱歉，校园助手现在有点忙，请稍后再试~";
         }
     }
 
@@ -112,7 +112,7 @@ public class AiChatServiceImpl implements AiChatService {
                     .getResult()
                     .getOutput()
                     .getContent();
-            log.info("Nowl AI(Function Calling)回复: {}", response);
+            log.info("校园助手(Function Calling)回复: {}", response);
             return response;
         } catch (Exception e) {
             log.error("AI Function Calling调用异常", e);
@@ -186,21 +186,21 @@ public class AiChatServiceImpl implements AiChatService {
 
     private String extractAssistantContent(String responseBody) {
         if (responseBody == null || responseBody.isBlank()) {
-            return "抱歉，Nowl AI现在有点忙，请稍后再试~";
+            return "抱歉，校园助手现在有点忙，请稍后再试~";
         }
 
         JSONObject response = JSONUtil.parseObj(responseBody);
         JSONArray choices = response.getJSONArray("choices");
         if (choices == null || choices.isEmpty()) {
             log.warn("多模态聊天未返回 choices: {}", responseBody);
-            return "抱歉，Nowl AI现在有点忙，请稍后再试~";
+            return "抱歉，校园助手现在有点忙，请稍后再试~";
         }
 
         JSONObject firstChoice = choices.getJSONObject(0);
         JSONObject message = firstChoice == null ? null : firstChoice.getJSONObject("message");
         if (message == null) {
             log.warn("多模态聊天未返回 message: {}", responseBody);
-            return "抱歉，Nowl AI现在有点忙，请稍后再试~";
+            return "抱歉，校园助手现在有点忙，请稍后再试~";
         }
 
         Object content = message.get("content");

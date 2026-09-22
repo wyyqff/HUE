@@ -4,11 +4,12 @@ import type { UserInfo, RegisterForm, LoginForm } from '@/types'
 import * as userApi from '@/api/modules/user'
 import { AuthStatus } from '@/constants'
 import { normalizeMediaData } from '@/utils/media'
+import { DEFAULT_CAMPUS } from '@/config/campus'
 
 export const useUserStore = defineStore('user', () => {
   // 状态
   const userInfo = ref<UserInfo | null>(null)
-  const currentCampus = ref<{ schoolCode: string; campusCode: string; name: string } | null>(null)
+  const currentCampus = ref<{ schoolCode: string; campusCode: string; name: string } | null>({ ...DEFAULT_CAMPUS })
 
   if (userInfo.value) {
     userInfo.value = normalizeMediaData(userInfo.value)
@@ -36,7 +37,7 @@ export const useUserStore = defineStore('user', () => {
           name: userInfo.value.campusName || '本校',
         }
       } else {
-        currentCampus.value = null // 游客、未认证、待审核用户，显示全部商品
+        currentCampus.value = { ...DEFAULT_CAMPUS }
       }
 
       return res
@@ -65,7 +66,7 @@ export const useUserStore = defineStore('user', () => {
   // 登出
   const clearLocalSession = () => {
     userInfo.value = null
-    currentCampus.value = null // 清除校区选择，避免残留影响下次登录
+    currentCampus.value = { ...DEFAULT_CAMPUS }
   }
 
   const logout = async (options?: { notifyServer?: boolean }) => {

@@ -4,6 +4,7 @@ import com.unimarket.common.enums.DisputeTargetType;
 import com.unimarket.common.enums.ErrandStatus;
 import com.unimarket.common.exception.BusinessException;
 import com.unimarket.module.dispute.dto.DisputeCreateDTO;
+import com.unimarket.module.dispute.entity.DisputeRecord;
 import com.unimarket.module.dispute.mapper.DisputeRecordMapper;
 import com.unimarket.module.dispute.service.impl.DisputeServiceImpl;
 import com.unimarket.module.errand.entity.ErrandTask;
@@ -84,6 +85,6 @@ class DisputeServiceImplErrandCreateTest {
 
         assertThrows(BusinessException.class, () -> disputeService.createDispute(200L, dto));
 
-        verify(disputeRecordMapper, never()).insert(any());
+        verify(disputeRecordMapper, never()).insert(any(DisputeRecord.class));
     }
 }

@@ -17,7 +17,7 @@ import {
   Users,
   XCircle,
 } from 'lucide-vue-next'
-import logoSvg from '@/assets/logo.svg'
+const logoSvg = '/campus/crest.png'
 import {
   getPendingAuditGoods,
   auditGoods,

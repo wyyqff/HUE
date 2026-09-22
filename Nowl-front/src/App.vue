@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import { Check, ChevronDown, LogOut, MapPin, Plus, User } from 'lucide-vue-next'
-import logoSvg from '@/assets/logo.svg'
+
 import { useUserStore } from '@/stores/user'
 import { useMessageStore } from '@/stores/message'
 import { useNotificationWs } from '@/composables/useNotificationWs'
@@ -126,7 +126,7 @@ const mainContentClass = computed(() => {
 })
 
 const campusName = computed(() => {
-  if (!userStore.isLoggedIn) return '未登录'
+  if (!userStore.isLoggedIn) return '河北工程大学'
   if (userStore.userInfo?.authStatus === AuthStatus.APPROVED) {
     if (userStore.currentCampus) return userStore.currentCampus.name
     return userStore.userInfo?.campusName || '全部校区'
@@ -291,12 +291,13 @@ onUnmounted(() => {
       <div class="proto-header-inner">
         <button type="button" class="logo-area" @click="navigateTo('home')" aria-label="返回首页">
           <div class="nav-logo">
-            <img :src="logoSvg" alt="Nowl" />
+            <span class="school-mark" role="img" aria-label="河北工程大学校徽"></span>
           </div>
-          <span class="logo-title">Nowl</span>
+          <span class="logo-title">河北工程大学<small>校园服务 · HEBEU</small></span>
         </button>
 
         <nav class="nav-links" aria-label="主导航">
+          <button type="button" class="nav-item" @click="router.push('/#campus-guide')">校园地图</button>
           <button type="button" class="nav-item" :class="{ active: isNavActive('home') }" @click="navigateTo('home')">
             首页
           </button>
@@ -307,7 +308,7 @@ onUnmounted(() => {
             跑腿
           </button>
           <button type="button" class="nav-item ai-helper" :class="{ active: isNavActive('chat') }" @click="navigateTo('chat')">
-            Nowl AI
+            校园助手
           </button>
           <button type="button" class="nav-item message-item" :class="{ active: isNavActive('message') }" @click="navigateTo('message')">
             消息
@@ -837,7 +838,7 @@ onUnmounted(() => {
 
 .profile-quick-item:hover {
   background: var(--um-bg-soft);
-  border-color: rgba(141, 110, 99, 0.4);
+  border-color: rgba(37, 75, 104, 0.4);
 }
 
 .profile-quick-item-full {
@@ -893,8 +894,9 @@ onUnmounted(() => {
 
   .nav-links {
     order: 3;
+    flex: 0 0 100%;
     width: 100%;
-    justify-content: flex-start;
+    justify-content: space-between;
     overflow-x: auto;
     gap: 18px;
     padding-bottom: 2px;
@@ -907,8 +909,11 @@ onUnmounted(() => {
 
 @media (max-width: 720px) {
   .logo-title {
-    display: none;
+    display: block;
   }
+
+  .campus-shell { display: none; }
+  .nav-item { font-size: 12px; }
 
   .nav-logo img {
     width: 42px;
@@ -947,4 +952,3 @@ onUnmounted(() => {
   transform: translateY(8px);
 }
 </style>
-

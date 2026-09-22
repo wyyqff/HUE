@@ -67,7 +67,7 @@ export interface GoodsPriceEstimateVO {
   referenceCount: number
 }
 
-// 与 Nowl AI 对话
+// 与 校园助手 对话
 export const chatWithAi = (message: string, imageUrl?: string, queryContext?: AiChatQueryContext) => {
   return request.post<AiChatResponseVO>(AI_API.CHAT, { message, imageUrl, queryContext })
 }

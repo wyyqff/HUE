@@ -8,6 +8,8 @@
 Thumbs.db
 
 # Local runtime / cache
+/local/
+/本地使用说明.md
 .esdata/
 .m2/
 .opencode/
