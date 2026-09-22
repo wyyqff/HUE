@@ -98,8 +98,7 @@ const router = createRouter({
     {
       path: '/chat',
       name: 'chat',
-      component: () => import('../views/ChatView.vue'),
-      meta: { title: '校园助手', requiresAuth: true },
+      redirect: '/market',
     },
     {
       path: '/chat/user/:id',

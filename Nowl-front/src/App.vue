@@ -297,7 +297,6 @@ onUnmounted(() => {
         </button>
 
         <nav class="nav-links" aria-label="主导航">
-          <button type="button" class="nav-item" @click="router.push('/#campus-guide')">校园地图</button>
           <button type="button" class="nav-item" :class="{ active: isNavActive('home') }" @click="navigateTo('home')">
             首页
           </button>
@@ -306,9 +305,6 @@ onUnmounted(() => {
           </button>
           <button type="button" class="nav-item" :class="{ active: isNavActive('errands') }" @click="navigateTo('errands')">
             跑腿
-          </button>
-          <button type="button" class="nav-item ai-helper" :class="{ active: isNavActive('chat') }" @click="navigateTo('chat')">
-            校园助手
           </button>
           <button type="button" class="nav-item message-item" :class="{ active: isNavActive('message') }" @click="navigateTo('message')">
             消息

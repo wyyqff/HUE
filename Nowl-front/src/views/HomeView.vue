@@ -1,268 +1,37 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import CampusGuide from '@/components/CampusGuide.vue'
 import { useRouter } from 'vue-router'
-
+import { ArrowRight, MapPin, Search, LoaderCircle } from 'lucide-vue-next'
+import CampusGuide from '@/components/CampusGuide.vue'
+import GoodsCard from '@/components/GoodsCard.vue'
+import MarketEmpty from '@/components/MarketEmpty.vue'
 import { getHomeRecommend } from '@/api/modules/recommend'
 import { useUserStore } from '@/stores/user'
 import { DEFAULT_CAMPUS } from '@/config/campus'
 import type { RecommendItemVO } from '@/types'
-import {
-  ArrowRight,
-  Bike,
-  LoaderCircle,
-  MapPin,
-  Package,
-  ShieldCheck,
-} from 'lucide-vue-next'
 
 const router = useRouter()
 const userStore = useUserStore()
-
-const RECOMMEND_LIMIT = 10
-const RECOMMEND_ROW_SIZE = 5
-
-const recommendGoods = ref<RecommendItemVO[]>([])
-const recommendLoading = ref(false)
-const usingMockRecommend = ref(false)
-
-interface HomeErrandTask {
-  taskId: number
-  title: string
-  reward: number
-  taskContent?: string
-  description?: string
-  pickupAddress?: string
-  deliveryAddress?: string
-}
-
-const errands = ref<HomeErrandTask[]>([
-  {
-    taskId: -1,
-    title: '代取菜鸟驿站快递',
-    reward: 3.5,
-    taskContent: '今晚 7 点前帮取一个小件，顺路送到三号宿舍楼下。',
-    pickupAddress: '菜鸟驿站',
-    deliveryAddress: '三号宿舍楼下',
-  },
-  {
-    taskId: -2,
-    title: '食堂带饭到图书馆',
-    reward: 4,
-    taskContent: '二食堂窗口取餐，送到图书馆东门。',
-    pickupAddress: '二食堂取餐口',
-    deliveryAddress: '图书馆东门',
-  },
-  {
-    taskId: -3,
-    title: '打印资料送教学楼',
-    reward: 5,
-    taskContent: '打印店取 20 页材料，送到教学楼 C 区 302。',
-    pickupAddress: '文印中心',
-    deliveryAddress: '教学楼 C 区 302',
-  },
-])
-
-const mockRecommendGoods: RecommendItemVO[] = [
-  {
-    productId: -101,
-    title: '罗技机械键盘 K98',
-    image: '/mock/recommend/keyboard.jpg',
-    price: 129,
-    categoryName: '数码产品',
-    sellerId: 0,
-    sellerName: '同学A',
-    recommendType: 'hot',
-  },
-  {
-    productId: -102,
-    title: '雅思备考全套教材',
-    image: '/mock/recommend/books.jpg',
-    price: 48,
-    categoryName: '图书资料',
-    sellerId: 0,
-    sellerName: '同学B',
-    recommendType: 'cf',
-  },
-  {
-    productId: -103,
-    title: '九成新羽毛球拍双拍',
-    image: '/mock/recommend/badminton.jpg',
-    price: 76,
-    categoryName: '运动器材',
-    sellerId: 0,
-    sellerName: '同学C',
-    recommendType: 'hybrid',
-  },
-  {
-    productId: -104,
-    title: '小米电水壶 1.5L',
-    image: '/mock/recommend/kettle.jpg',
-    price: 35,
-    categoryName: '宿舍好物',
-    sellerId: 0,
-    sellerName: '同学D',
-    recommendType: 'content',
-  },
-  {
-    productId: -105,
-    title: '便携投影仪 mini 版',
-    image: '/mock/recommend/projector.jpg',
-    price: 188,
-    categoryName: '影音设备',
-    sellerId: 0,
-    sellerName: '同学E',
-    recommendType: 'hot',
-  },
-  {
-    productId: -106,
-    title: 'Switch 健身环套装',
-    image: '/mock/recommend/console.jpg',
-    price: 219,
-    categoryName: '游戏娱乐',
-    sellerId: 0,
-    sellerName: '同学F',
-    recommendType: 'cf',
-  },
-  {
-    productId: -107,
-    title: 'ins 拍立得 mini11',
-    image: '/mock/recommend/camera.jpg',
-    price: 169,
-    categoryName: '摄影器材',
-    sellerId: 0,
-    sellerName: '同学G',
-    recommendType: 'content',
-  },
-  {
-    productId: -108,
-    title: '宿舍收纳抽屉柜',
-    image: '/mock/recommend/storage.jpg',
-    price: 26,
-    categoryName: '宿舍日用',
-    sellerId: 0,
-    sellerName: '同学H',
-    recommendType: 'hybrid',
-  },
-  {
-    productId: -109,
-    title: '晨跑蓝牙耳机',
-    image: '/mock/recommend/headphones.jpg',
-    price: 58,
-    categoryName: '耳机音频',
-    sellerId: 0,
-    sellerName: '同学I',
-    recommendType: 'hot',
-  },
-  {
-    productId: -110,
-    title: '高数真题冲刺卷',
-    image: '/mock/recommend/study.jpg',
-    price: 18,
-    categoryName: '学习资料',
-    sellerId: 0,
-    sellerName: '同学J',
-    recommendType: 'cf',
-  },
-]
-
-const reasons = [
-  {
-    title: '拾光集市',
-    desc: '校内面对面交易，告别快递等待，拒绝货不对板，让闲置就近流转。',
-    icon: Package,
-  },
-  {
-    title: '校园跑腿',
-    desc: '代取快递、食堂带饭、打印资料，河工程同学随时待命，响应更快。',
-    icon: Bike,
-  },
-  {
-    title: '校园隔离',
-    desc: '按学校和校区精准匹配，交易发生在步行可达范围，沟通履约更安心。',
-    icon: ShieldCheck,
-  },
-]
-
 const campusName = computed(() => userStore.currentCampus?.name || DEFAULT_CAMPUS.name)
-
-const topRecommendGoods = computed(() => recommendGoods.value.slice(0, RECOMMEND_ROW_SIZE))
-const bottomRecommendGoods = computed(() => recommendGoods.value.slice(RECOMMEND_ROW_SIZE, RECOMMEND_LIMIT))
-
-const formatPrice = (price: number | undefined) => {
-  if (typeof price !== 'number') return '--'
-  return Number.isInteger(price) ? String(price) : price.toFixed(2)
-}
-
-const getRecommendBadge = (type?: string) => {
-  if (type === 'hot') return '热门'
-  if (type === 'cf') return '猜你喜欢'
-  if (type === 'content') return '相似推荐'
-  if (type === 'hybrid') return '智能推荐'
-  return '精选'
-}
-
-const fetchRecommendGoods = async () => {
-  recommendLoading.value = true
-  usingMockRecommend.value = false
-
+const keyword = ref('')
+const goods = ref<RecommendItemVO[]>([])
+const loading = ref(false)
+const failed = ref(false)
+let requestVersion = 0
+async function fetchGoods() {
+  const version = ++requestVersion
+  loading.value = true
+  failed.value = false
   try {
-    const schoolCode = userStore.currentCampus?.schoolCode
-    const campusCode = userStore.currentCampus?.campusCode
-    const result = await getHomeRecommend(1, RECOMMEND_LIMIT, schoolCode, campusCode)
-    const records = (result.records || []).slice(0, RECOMMEND_LIMIT)
-
-    if (records.length < RECOMMEND_LIMIT) {
-      recommendGoods.value = mockRecommendGoods
-      usingMockRecommend.value = true
-      return
-    }
-
-    recommendGoods.value = records
-  } catch (error) {
-    console.error('获取推荐好物失败', error)
-    recommendGoods.value = mockRecommendGoods
-    usingMockRecommend.value = true
-  } finally {
-    recommendLoading.value = false
-  }
+    const result = await getHomeRecommend(1, 8, userStore.currentCampus?.schoolCode, userStore.currentCampus?.campusCode)
+    if (version === requestVersion) goods.value = (result.records || []).filter(item => item.productId > 0)
+  } catch {
+    if (version === requestVersion) { goods.value = []; failed.value = true }
+  } finally { if (version === requestVersion) loading.value = false }
 }
-
-const goToMarket = () => {
-  router.push('/market')
-}
-
-const goToErrands = () => {
-  router.push('/errands')
-}
-
-const goToProduct = (productId: number) => {
-  router.push(`/product/${productId}`)
-}
-
-const handleRecommendClick = (item: RecommendItemVO) => {
-  if (item.productId > 0) {
-    goToProduct(item.productId)
-    return
-  }
-  goToMarket()
-}
-
-const handleErrandCardClick = () => {
-  goToErrands()
-}
-
-const openAssistant = () => {
-  router.push('/chat')
-}
-
-watch(
-  () => userStore.currentCampus,
-  () => {
-    void fetchRecommendGoods()
-  },
-  { deep: true, immediate: true },
-)
+function goToMarket() { router.push({ path: '/market', query: keyword.value.trim() ? { q: keyword.value.trim() } : {} }) }
+function goToPublish() { router.push(userStore.isLoggedIn ? '/publish' : '/login?redirect=/publish') }
+watch(() => userStore.currentCampus, fetchGoods, { deep: true, immediate: true })
 </script>
 
 <template>
@@ -285,203 +54,24 @@ watch(
             逛逛校园集市
             <ArrowRight :size="16" />
           </button>
-          <button type="button" class="hero-btn secondary" @click="goToErrands">
-            了解校园跑腿
+          <button type="button" class="hero-btn secondary" @click="goToPublish">
+            发布闲置好物
           </button>
         </div>
       </div>
 
       <div class="hero-visual"><figure class="campus-photo"><img src="/campus/wanxia.jpg" alt="河北工程大学湖畔晚霞与天鹅，7972像素高清校园实景" width="7972" height="3307" fetchpriority="high" decoding="async" /><figcaption><span>HEBEU · CAMPUS MOMENTS</span><strong>湖畔晚霞 · 定格河工程的美好</strong></figcaption></figure></div>
     </section>
+    <section class="market-preview" aria-labelledby="market-preview-title">
+      <div class="market-preview-head"><div><p class="market-eyebrow">CAMPUS MARKET</p><h2 id="market-preview-title">让闲置，遇见新主人</h2><p>同校找好物，聊清楚再下单，见面验货更放心。</p></div><button class="all-goods" @click="goToMarket">浏览集市 <ArrowRight :size="16" /></button></div>
+      <form class="home-search" @submit.prevent="goToMarket"><Search :size="20" /><input v-model="keyword" aria-label="搜索校园二手商品" placeholder="搜索教材、数码、生活用品…" maxlength="100" /><button type="submit">找好物</button></form>
+      <div v-if="loading" class="market-state" role="status"><LoaderCircle class="spin" :size="25" /><p>正在加载校内好物…</p></div>
+      <div v-else-if="failed" class="market-state" role="status"><p>商品暂时未加载成功</p><button @click="fetchGoods">重新加载</button></div>
+      <MarketEmpty v-else-if="!goods.length" @publish="goToPublish" />
+      <div v-else class="home-goods-grid"><GoodsCard v-for="item in goods" :key="item.productId" :product="item" :show-collect="false" @select="id => router.push('/product/' + id)" /></div>
+      <div class="trade-steps"><span>01 · 如实描述成色与瑕疵</span><span>02 · 站内沟通约好面交</span><span>03 · 当面检查后确认收货</span></div>
+    </section>
     <CampusGuide />
-
-    <section class="recommend-section">
-      <div class="recommend-head">
-        <h2 class="section-title">校园集市 · 好物推荐</h2>
-        <p class="recommend-subtitle">精选 10 件好物推荐</p>
-        <p v-if="usingMockRecommend" class="recommend-fallback-tip">
-          暂未发布校园好物，以下为体验示例。
-        </p>
-      </div>
-
-      <div v-if="recommendLoading" class="recommend-feedback">
-        <LoaderCircle :size="18" class="spin" />
-        正在加载校园好物...
-      </div>
-
-      <div v-else class="recommend-marquee">
-  <div class="recommend-row">
-    <div class="recommend-track move-right">
-      <div class="recommend-group">
-        <article
-          v-for="item in topRecommendGoods"
-          :key="`top-a-${item.productId}`"
-          class="recommend-card"
-          @click="handleRecommendClick(item)"
-        >
-          <div class="recommend-cover">
-            <img v-if="item.image" :src="item.image" :alt="item.title" loading="lazy" />
-            <div v-else class="recommend-placeholder">
-              <span class="school-mark" role="img" aria-label="河北工程大学校徽"></span>
-            </div>
-            <span class="recommend-type">{{ getRecommendBadge(item.recommendType) }}</span>
-          </div>
-          <div class="recommend-body">
-            <h3>{{ item.title }}</h3>
-            <p class="recommend-category">{{ item.categoryName || '校园精选好物' }}</p>
-            <div class="recommend-meta">
-              <span class="price">¥{{ formatPrice(item.price) }}</span>
-              <span class="seller">{{ item.sellerName || '河工程同学' }}</span>
-            </div>
-          </div>
-        </article>
-      </div>
-
-      <div class="recommend-group" aria-hidden="true">
-        <article
-          v-for="item in topRecommendGoods"
-          :key="`top-b-${item.productId}`"
-          class="recommend-card"
-          @click="handleRecommendClick(item)"
-        >
-          <div class="recommend-cover">
-            <img v-if="item.image" :src="item.image" :alt="item.title" loading="lazy" />
-            <div v-else class="recommend-placeholder">
-              <span class="school-mark" role="img" aria-label="河北工程大学校徽"></span>
-            </div>
-            <span class="recommend-type">{{ getRecommendBadge(item.recommendType) }}</span>
-          </div>
-          <div class="recommend-body">
-            <h3>{{ item.title }}</h3>
-            <p class="recommend-category">{{ item.categoryName || '校园精选好物' }}</p>
-            <div class="recommend-meta">
-              <span class="price">¥{{ formatPrice(item.price) }}</span>
-              <span class="seller">{{ item.sellerName || '河工程同学' }}</span>
-            </div>
-          </div>
-        </article>
-      </div>
-    </div>
-  </div>
-
-  <div class="recommend-row">
-    <div class="recommend-track move-left">
-      <div class="recommend-group">
-        <article
-          v-for="item in bottomRecommendGoods"
-          :key="`bottom-a-${item.productId}`"
-          class="recommend-card"
-          @click="handleRecommendClick(item)"
-        >
-          <div class="recommend-cover">
-            <img v-if="item.image" :src="item.image" :alt="item.title" loading="lazy" />
-            <div v-else class="recommend-placeholder">
-              <span class="school-mark" role="img" aria-label="河北工程大学校徽"></span>
-            </div>
-            <span class="recommend-type">{{ getRecommendBadge(item.recommendType) }}</span>
-          </div>
-          <div class="recommend-body">
-            <h3>{{ item.title }}</h3>
-            <p class="recommend-category">{{ item.categoryName || '校园精选好物' }}</p>
-            <div class="recommend-meta">
-              <span class="price">¥{{ formatPrice(item.price) }}</span>
-              <span class="seller">{{ item.sellerName || '河工程同学' }}</span>
-            </div>
-          </div>
-        </article>
-      </div>
-
-      <div class="recommend-group" aria-hidden="true">
-        <article
-          v-for="item in bottomRecommendGoods"
-          :key="`bottom-b-${item.productId}`"
-          class="recommend-card"
-          @click="handleRecommendClick(item)"
-        >
-          <div class="recommend-cover">
-            <img v-if="item.image" :src="item.image" :alt="item.title" loading="lazy" />
-            <div v-else class="recommend-placeholder">
-              <span class="school-mark" role="img" aria-label="河北工程大学校徽"></span>
-            </div>
-            <span class="recommend-type">{{ getRecommendBadge(item.recommendType) }}</span>
-          </div>
-          <div class="recommend-body">
-            <h3>{{ item.title }}</h3>
-            <p class="recommend-category">{{ item.categoryName || '校园精选好物' }}</p>
-            <div class="recommend-meta">
-              <span class="price">¥{{ formatPrice(item.price) }}</span>
-              <span class="seller">{{ item.sellerName || '河工程同学' }}</span>
-            </div>
-          </div>
-        </article>
-      </div>
-    </div>
-  </div>
-</div>
-    </section>
-
-    <section class="runner-section">
-      <div class="runner-head">
-        <h2 class="section-title">校园跑腿 · 实时必达</h2>
-        <p>从起点到终点，一路陪伴</p>
-      </div>
-
-      <div class="runner-layout">
-        <div class="task-list">
-          <article
-            v-for="task in errands"
-            :key="task.taskId"
-            class="task-card"
-            @click="handleErrandCardClick"
-          >
-            <div class="task-header">
-              <span class="task-title">
-                <Package :size="16" />
-                {{ task.title }}
-              </span>
-              <span class="bounty">¥{{ formatPrice(task.reward) }}</span>
-            </div>
-            <p>{{ task.taskContent || task.description || '跑腿需求已发布，等待同学接单中。' }}</p>
-            <div class="task-route">
-              <MapPin :size="14" />
-              <span>{{ task.pickupAddress || '校内取货点' }} → {{ task.deliveryAddress || '指定送达点' }}</span>
-            </div>
-          </article>
-        </div>
-
-        <div class="map-viz" aria-hidden="true">
-          <div class="map-grid"></div>
-          <svg class="route-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-            <path d="M 8 78 C 22 24, 38 62, 52 38 C 64 18, 76 62, 92 24" />
-          </svg>
-          <div class="map-tag origin">取货点</div>
-          <div class="map-tag waypoint">骑手配送中</div>
-          <div class="map-tag destination">送达点</div>
-          <div class="runner-courier">
-            <Bike :size="17" />
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="why-section">
-      <h2 class="why-title">属于河工程的校园生活</h2>
-      <div class="why-grid">
-        <article v-for="item in reasons" :key="item.title" class="why-card">
-          <div class="why-icon">
-            <component :is="item.icon" :size="28" />
-          </div>
-          <h3>{{ item.title }}</h3>
-          <p>{{ item.desc }}</p>
-        </article>
-      </div>
-    </section>
-
-    <button type="button" class="assistant-float" @click="openAssistant" aria-label="打开校园助手">
-      <span class="assistant-pulse"></span>
-      <span class="assistant-text"><strong>校园助手：</strong>同学，有什么可以帮你的？</span>
-    </button>
   </div>
 </template>
-
 <style scoped src="./HomeView.css"></style>

@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { AlertTriangle, DollarSign, Sparkles, Loader2, ShoppingBag } from 'lucide-vue-next'
+import { AlertTriangle, DollarSign, Loader2, ShoppingBag } from 'lucide-vue-next'
 import { publishGoods, getCategoryTree, getGoodsDetail, updateGoods } from '@/api/modules/goods'
-import { estimatePriceWithAi } from '@/api/modules/ai'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from '@/utils/feedback'
 import { showSuccess, showWarning, showNeedAuth } from '@/utils/modal'
@@ -28,7 +27,7 @@ const publishForm = ref({
   price: '',
   condition: '9',
   categoryId: undefined as number | undefined,
-  tradeType: 2,
+  tradeType: 0,
   images: [] as string[],
   deliveryFee: '',
 })
@@ -42,11 +41,6 @@ const secondLevelCategories = computed(() => {
   return parent?.children || []
 })
 const loading = ref(false)
-
-// AI估价相关
-const isEstimating = ref(false)
-const isPriceFromAi = ref(false)
-const estimateReason = ref('')
 
 const productId = computed(() => parsePositiveQueryId(route.query.id))
 const hasProductIdParam = computed(() => route.query.id !== undefined)
@@ -65,23 +59,13 @@ const pageTitle = computed(() =>
 )
 
 const pageSubtitle = computed(() =>
-  isRejected.value ? '修改商品信息后将重新进行审核' : (relistMode.value ? '修改商品信息后重新上架，将重新进行AI审核' : 'AI 智能估价，合理定价更快出')
+  isRejected.value ? '修改商品信息后将重新进行审核' : (relistMode.value ? '修改商品信息后重新上架，将重新进行审核' : '写清成色与瑕疵，自主定价，校内当面交易')
 )
 
 const backTarget = computed(() => (isEditMode.value ? '/profile/my-goods' : '/market'))
 const submitButtonText = computed(() =>
   relistMode.value ? '确认重新上架' : (isEditMode.value ? '确认修改' : '立即上架'),
 )
-
-// 检查是否可以估价（需要图片、标题、分类、描述）
-const canEstimate = computed(() => {
-  return (
-    publishForm.value.images.length > 0 &&
-    publishForm.value.title.trim() !== '' &&
-    publishForm.value.categoryId !== undefined &&
-    publishForm.value.desc.trim() !== ''
-  )
-})
 
 // 格式化价格为 X.00 格式
 const formatPrice = (value: string): string => {
@@ -90,15 +74,6 @@ const formatPrice = (value: string): string => {
   if (isNaN(num)) return ''
   return num.toFixed(2)
 }
-
-// 监听价格变化，用户手动修改时取消AI标记
-watch(() => publishForm.value.price, (newVal, oldVal) => {
-  if (isPriceFromAi.value && newVal !== oldVal) {
-    // 用户手动修改了价格
-    isPriceFromAi.value = false
-    estimateReason.value = ''
-  }
-}, { flush: 'sync' })
 
 // 获取分类列表
 const fetchCategories = async () => {
@@ -176,36 +151,6 @@ const handleSecondCategoryChange = () => {
   publishForm.value.categoryId = selectedSecondCategoryId.value
 }
 
-// AI估价
-const handleEstimate = async () => {
-  if (!canEstimate.value) {
-    ElMessage.warning('请先填写商品图片、标题、分类和描述')
-    return
-  }
-
-  isEstimating.value = true
-  try {
-    const res = await estimatePriceWithAi({
-      title: publishForm.value.title,
-      description: publishForm.value.desc,
-      categoryId: publishForm.value.categoryId!,
-      imageUrl: publishForm.value.images[0] || undefined,
-      itemCondition: Number(publishForm.value.condition),
-    })
-
-    // 填入价格并标记为AI生成
-    publishForm.value.price = res.suggestedPrice.toFixed(2)
-    isPriceFromAi.value = true
-    estimateReason.value = res.reason || '基于同类商品分析'
-
-  } catch (err) {
-    console.error('AI估价失败', err)
-    ElMessage.error('AI估价服务暂时不可用，请稍后重试')
-  } finally {
-    isEstimating.value = false
-  }
-}
-
 // 价格输入失焦时格式化
 const handlePriceBlur = () => {
   if (publishForm.value.price) {
@@ -235,6 +180,12 @@ const handlePublish = async () => {
 
   if (!publishForm.value.title || !publishForm.value.categoryId || !publishForm.value.price) {
     ElMessage.warning('请填写完整信息')
+    return
+  }
+
+  const price = Number(publishForm.value.price)
+  if (!Number.isFinite(price) || price <= 0) {
+    ElMessage.warning('请输入大于 0 的有效价格')
     return
   }
 
@@ -363,41 +314,25 @@ onMounted(async () => {
           <textarea
             rows="4"
             class="w-full mt-1"
-            placeholder="介绍一下你的宝贝..."
+            placeholder="例如：购买时间、使用情况、已有瑕疵、包含配件，以及方便面交的校内地点。"
             v-model="publishForm.desc"
           ></textarea>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
-          <!-- 价格 + AI估价按钮 -->
+          <!-- 自主定价 -->
           <div>
             <label class="text-xs font-bold text-slate-400 uppercase ml-2">价格</label>
             <div class="relative mt-1">
               <DollarSign class="absolute left-3 top-3.5 text-slate-400" :size="16" />
               <input
                 type="text"
-                class="w-full um-input-with-prefix pr-24 py-3 transition-colors"
-                :class="isPriceFromAi ? 'text-green-600 font-bold' : ''"
+                class="w-full um-input-with-prefix pr-4 py-3 transition-colors"
                 placeholder="0.00"
                 v-model="publishForm.price"
                 @blur="handlePriceBlur"
               />
-              <button
-                type="button"
-                @click="handleEstimate"
-                :disabled="isEstimating || !canEstimate"
-                class="absolute right-2 top-1.5 px-3 py-1.5 um-btn um-btn-primary text-xs disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-              >
-                <Loader2 v-if="isEstimating" class="animate-spin" :size="14" />
-                <Sparkles v-else :size="14" />
-                估价
-              </button>
             </div>
-            <!-- AI估价原因 -->
-            <p v-if="estimateReason" class="mt-2 text-xs text-green-600 ml-2">
-              <Sparkles :size="12" class="inline mr-1" />
-              {{ estimateReason }}
-            </p>
           </div>
 
           <div>

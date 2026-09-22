@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { ElImage } from 'element-plus'
 import { Camera, X } from 'lucide-vue-next'
 import { ElMessage } from '@/utils/feedback'
 import { uploadFile } from '@/api/modules/file'
@@ -66,8 +67,9 @@ const handleFileChange = async (event: Event) => {
       return res
     })
 
-    const results = await Promise.all(uploadPromises)
-    const validUrls = results.filter((url) => url !== null) as string[]
+    const results = await Promise.allSettled(uploadPromises)
+    const validUrls = results.flatMap(result => result.status === 'fulfilled' && result.value ? [result.value] : [])
+    if (results.some(result => result.status === 'rejected')) ElMessage.error('部分图片上传失败，成功的图片已保留，可重试失败的图片')
 
     if (validUrls.length > 0) {
       emit('update:modelValue', [...props.modelValue, ...validUrls])
@@ -98,10 +100,10 @@ const removeImage = (index: number) => {
         :key="url"
         class="relative aspect-square rounded-2xl overflow-hidden border-2 border-slate-200 group"
       >
-        <img :src="url" class="w-full h-full object-cover" />
+        <ElImage :src="url" :preview-src-list="modelValue" :initial-index="index" preview-teleported fit="cover" class="w-full h-full" :alt="'商品图片 ' + (index + 1)" />
         <button
-          @click="removeImage(index)"
-          class="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+          type="button" :aria-label="'移除第 ' + (index + 1) + ' 张图片'" @click="removeImage(index)"
+          class="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-100 transition-opacity"
         >
           <X :size="16" />
         </button>
@@ -142,7 +144,7 @@ const removeImage = (index: number) => {
     <div class="mt-2 text-xs text-slate-400">
       <p>• 支持jpg、png、gif、webp格式</p>
       <p>• 单张图片不超过{{ maxSize }}MB</p>
-      <p>• 第一张图片将作为封面</p>
+      <p>• 第一张图片将作为封面，点击图片可放大检查细节（原图上传，不压缩）</p>
     </div>
   </div>
 </template>

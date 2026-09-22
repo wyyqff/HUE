@@ -330,7 +330,7 @@ onMounted(() => {
         </button>
       </section>
 
-      <div class="text-center text-xs text-um-muted py-2">校园助手 v1.0.0</div>
+      <div class="text-center text-xs text-um-muted py-2">河北工程大学校园服务</div>
     </div>
   </SubPageShell>
 </template>

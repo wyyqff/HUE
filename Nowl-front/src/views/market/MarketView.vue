@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ShieldCheck, CheckCircle2, Heart, Search, X, Clock, TrendingUp } from 'lucide-vue-next'
+import { parsePriceQuery, validatePriceRange } from '@/utils/marketFilters'
+import { ShieldCheck, Search, X, Clock, TrendingUp } from 'lucide-vue-next'
 import { getCategoryTree, collectGoods, uncollectGoods } from '@/api/modules/goods'
 import {
   getHotWords,
@@ -14,7 +15,9 @@ import { getHotRecommend } from '@/api/modules/recommend'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from '@/utils/feedback'
 import type { ItemCategory, SearchResultVO } from '@/types'
-import LazyImage from '@/components/LazyImage.vue'
+import GoodsCard from '@/components/GoodsCard.vue'
+import MarketEmpty from '@/components/MarketEmpty.vue'
+import { ElSkeleton, ElSkeletonItem } from 'element-plus'
 import InfiniteListFooter from '@/components/InfiniteListFooter.vue'
 import { SEARCH } from '@/config/constants'
 import { PAGE_CONSTANTS } from '@/constants'
@@ -55,6 +58,36 @@ const searchHistory = ref<string[]>([])
 const suggestions = ref<string[]>([])
 const isSearchMode = ref(false) // 是否处于搜索模式
 
+// Applied values are separate from drafts so invalid edits never change the query.
+const minPrice = ref('')
+const maxPrice = ref('')
+const draftMinPrice = ref('')
+const draftMaxPrice = ref('')
+const priceError = ref('')
+watch([minPrice, maxPrice], ([min, max]) => { draftMinPrice.value = min; draftMaxPrice.value = max })
+function applyBudget() {
+  priceError.value = validatePriceRange(draftMinPrice.value, draftMaxPrice.value)
+  if (priceError.value) return
+  minPrice.value = parsePriceQuery(draftMinPrice.value)
+  maxPrice.value = parsePriceQuery(draftMaxPrice.value)
+  isSearchMode.value = true
+  pageNum.value = 1
+  refresh()
+}
+function clearFilters() {
+  searchKeyword.value = ''
+  selectedFirstCategoryId.value = undefined
+  selectedSecondCategoryId.value = undefined
+  sortType.value = 0
+  minPrice.value = ''; maxPrice.value = ''
+  draftMinPrice.value = ''; draftMaxPrice.value = ''; priceError.value = ''
+  isSearchMode.value = false
+  showSearchPanel.value = false
+  suggestions.value = []
+  pageNum.value = 1
+  refresh()
+}
+
 // 排序相关
 const sortType = ref(0) // 0-综合 1-最新 2-价格升序 3-价格降序 4-热度
 const showSortDropdown = ref(false)
@@ -78,25 +111,13 @@ const highlightParts = (text: string, keyword: string) => {
     .map(part => ({ text: part, highlight: part.toLowerCase() === keyword.toLowerCase() }))
 }
 
-// 安全渲染高亮标题：只保留 <em> 标签，其他 HTML 标签转义
-const renderHighlightTitle = (title: string) => {
-  if (!title) return ''
-  // 先转义所有 HTML，再把 &lt;em&gt; 和 &lt;/em&gt; 还原
-  const escaped = title
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-  // 还原 <em> 标签
-  return escaped
-    .replace(/&lt;em&gt;/g, '<em class="text-warm-500 not-italic font-medium">')
-    .replace(/&lt;\/em&gt;/g, '</em>')
-}
-
 // 查询参数
 const goodsQueryParams = computed(() => {
   const params: Record<string, unknown> = {
     keyword: searchKeyword.value || undefined,
     tradeStatus: 0,
+    minPrice: minPrice.value === '' ? undefined : Number(minPrice.value),
+    maxPrice: maxPrice.value === '' ? undefined : Number(maxPrice.value),
     schoolCode: userStore.currentCampus?.schoolCode,
     campusCode: userStore.currentCampus?.campusCode,
     sortType: sortType.value,
@@ -144,6 +165,8 @@ const {
 })
 
 useListQuerySync([
+  createQueryBinding({ key: 'min', state: minPrice, defaultValue: '', parse: parsePriceQuery, serialize: value => value || undefined }),
+  createQueryBinding({ key: 'max', state: maxPrice, defaultValue: '', parse: parsePriceQuery, serialize: value => value || undefined }),
   createQueryBinding({
     key: 'q',
     state: searchKeyword,
@@ -187,18 +210,28 @@ useListQuerySync([
   }),
 ], {
   onQueryApplied: changedKeys => {
+    if (validatePriceRange(minPrice.value, maxPrice.value)) { minPrice.value = ''; maxPrice.value = '' }
+    draftMinPrice.value = minPrice.value; draftMaxPrice.value = maxPrice.value
     if (changedKeys.includes('c1') && !selectedFirstCategoryId.value) {
       selectedSecondCategoryId.value = undefined
     }
     isSearchMode.value = !!searchKeyword.value
       || !!selectedFirstCategoryId.value
       || !!selectedSecondCategoryId.value
-      || sortType.value !== 0
+      || sortType.value !== 0 || minPrice.value !== '' || maxPrice.value !== ''
     refresh(pageNum.value)
   },
 })
 
 const collectPendingGoodsIds = ref<Set<number>>(new Set())
+
+// Initial URL parsing does not invoke onQueryApplied; normalize before the first request too.
+if (validatePriceRange(minPrice.value, maxPrice.value)) {
+  minPrice.value = ''
+  maxPrice.value = ''
+}
+draftMinPrice.value = minPrice.value
+draftMaxPrice.value = maxPrice.value
 
 const setLoadMoreTrigger = (element: HTMLElement | null) => {
   loadMoreTrigger.value = element
@@ -355,7 +388,7 @@ const handleSearchEnter = () => {
 // 清空搜索
 const clearSearch = () => {
   searchKeyword.value = ''
-  isSearchMode.value = false
+  isSearchMode.value = !!selectedFirstCategoryId.value || !!selectedSecondCategoryId.value || sortType.value !== 0 || minPrice.value !== '' || maxPrice.value !== ''
   suggestions.value = []
   pageNum.value = 1
   refresh()
@@ -365,14 +398,14 @@ const clearSearch = () => {
 const selectFirstCategory = (categoryId: number | undefined) => {
   selectedFirstCategoryId.value = categoryId || undefined
   selectedSecondCategoryId.value = undefined
-  isSearchMode.value = !!searchKeyword.value || !!selectedFirstCategoryId.value || sortType.value !== 0
+  isSearchMode.value = !!searchKeyword.value || !!selectedFirstCategoryId.value || sortType.value !== 0 || minPrice.value !== '' || maxPrice.value !== ''
   pageNum.value = 1
   refresh()
 }
 
 const selectSecondCategory = (categoryId: number | undefined) => {
   selectedSecondCategoryId.value = categoryId || undefined
-  isSearchMode.value = !!searchKeyword.value || !!selectedFirstCategoryId.value || sortType.value !== 0
+  isSearchMode.value = !!searchKeyword.value || !!selectedFirstCategoryId.value || sortType.value !== 0 || minPrice.value !== '' || maxPrice.value !== ''
   pageNum.value = 1
   refresh()
 }
@@ -380,7 +413,7 @@ const selectSecondCategory = (categoryId: number | undefined) => {
 // 切换排序
 const selectSort = (type: number) => {
   sortType.value = type
-  isSearchMode.value = !!searchKeyword.value || !!selectedFirstCategoryId.value || !!selectedSecondCategoryId.value || type !== 0
+  isSearchMode.value = !!searchKeyword.value || !!selectedFirstCategoryId.value || !!selectedSecondCategoryId.value || type !== 0 || minPrice.value !== '' || maxPrice.value !== ''
   showSortDropdown.value = false
   pageNum.value = 1
   refresh()
@@ -427,11 +460,7 @@ const goToDetail = (productId: number) => {
   router.push(`/product/${productId}`)
 }
 
-const formatGoodsCampus = (product: SearchResultVO) => {
-  const school = product.schoolName || product.schoolCode || '未知学校'
-  const campus = product.campusName || product.campusCode || '校区未知'
-  return `${school} · ${campus}`
-}
+
 
 // 处理搜索框聚焦
 const handleSearchFocus = () => {
@@ -464,7 +493,7 @@ onMounted(() => {
   isSearchMode.value = !!searchKeyword.value
     || !!selectedFirstCategoryId.value
     || !!selectedSecondCategoryId.value
-    || sortType.value !== 0
+    || sortType.value !== 0 || minPrice.value !== '' || maxPrice.value !== ''
   fetchCategories()
   fetchHotWords()
   refresh(pageNum.value)
@@ -488,6 +517,7 @@ onUnmounted(() => {
   <div class="animate-in fade-in duration-500 space-y-6">
     <!-- Unified Search & Category Card -->
     <div class="um-card p-6 space-y-5">
+      <div class="flex flex-wrap items-center justify-between gap-2"><h1 class="text-xl font-bold text-um-text">校园二手集市</h1><span class="text-xs text-um-muted">只看本校在售好物</span></div>
       <!-- Search Bar -->
       <div class="relative">
         <div
@@ -656,6 +686,12 @@ onUnmounted(() => {
           </div>
         </div>
 
+        <form class="budget-filter" @submit.prevent="applyBudget">
+          <span>预算</span><label><span class="sr-only">最低价格</span><input v-model="draftMinPrice" inputmode="decimal" placeholder="最低价" aria-label="最低价格" /></label><span>—</span><label><span class="sr-only">最高价格</span><input v-model="draftMaxPrice" inputmode="decimal" placeholder="最高价" aria-label="最高价格" /></label>
+          <button type="submit" class="budget-apply">应用预算</button><button type="button" @click="clearFilters">清空筛选</button>
+          <p v-if="priceError" role="alert" class="budget-error">{{ priceError }}</p>
+          <p v-else-if="minPrice !== '' || maxPrice !== ''" class="budget-applied">当前预算：{{ minPrice || '0' }} — {{ maxPrice || '不限' }} 元</p>
+        </form>
         <!-- Sort Options -->
         <div class="flex items-center gap-2 pt-2 border-t border-warm-50">
           <span class="text-xs font-bold text-um-muted whitespace-nowrap">排序：</span>
@@ -688,7 +724,7 @@ onUnmounted(() => {
           校园认证开启
         </div>
         <h2 class="text-xl font-bold text-um-text leading-tight">
-          通过校内身份认证，即可享有安全的交易体验。
+          发布商品前，请先完成校内身份认证。
         </h2>
         <button
           class="mt-4 um-btn um-btn-primary px-4 py-2 text-sm"
@@ -710,64 +746,15 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <!-- Loading -->
-    <div v-if="showInitialLoading" class="text-center py-12">
-      <div
-        class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-warm-500 border-t-transparent"
-      ></div>
-      <p class="mt-4 text-um-muted">加载中...</p>
-    </div>
-
-    <!-- Empty State -->
-    <div v-else-if="goodsList.length === 0" class="text-center py-12">
-      <p class="text-slate-500">{{ isSearchMode ? '未找到相关商品，换个关键词试试吧' : '暂无商品' }}</p>
-    </div>
-
+    <!-- Loading and empty states use reusable Element Plus components. -->
+    <ElSkeleton v-if="showInitialLoading" animated :count="8" class="grid grid-cols-2 md:grid-cols-4 gap-5"><template #template><div class="um-card overflow-hidden"><ElSkeletonItem variant="image" style="width:100%;aspect-ratio:4/3;height:auto" /><div class="p-4"><ElSkeletonItem variant="h3" /><ElSkeletonItem variant="text" style="margin-top:16px;width:50%" /></div></div></template></ElSkeleton>
+    <MarketEmpty v-else-if="goodsList.length === 0" :filtered="isSearchMode" @reset="clearFilters" @publish="router.push('/publish')" />
     <!-- Grid -->
-    <div v-else>
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
-        <div
-          v-for="product in goodsList"
-          :key="product.productId"
-          class="group um-card overflow-hidden hover:-translate-y-1 transition-all duration-300 cursor-pointer"
-          @click="goToDetail(product.productId)"
-        >
-          <div class="relative aspect-[4/3] overflow-hidden">
-            <LazyImage
-              :src="product.image || 'https://via.placeholder.com/400x300?text=No+Image'"
-              :alt="product.title"
-            />
-            <div
-              class="absolute top-2 left-2 bg-black/55 text-white text-[10px] px-2 py-1 rounded-lg flex items-center gap-1"
-            >
-              <CheckCircle2 :size="10" class="text-green-400" /> 校内认证
-            </div>
-            <button
-              class="absolute bottom-2 right-2 p-1.5 bg-white border border-warm-100 rounded-full transition-opacity"
-              :class="
-                product.isCollected
-                  ? 'text-warm-500'
-                  : 'text-slate-400 opacity-0 group-hover:opacity-100'
-              "
-              @click.stop="toggleCollect(product)"
-            >
-              <Heart :size="16" :fill="product.isCollected ? 'currentColor' : 'none'" />
-            </button>
-          </div>
-          <div class="p-4">
-            <h3 class="font-bold text-um-text text-sm mb-1 line-clamp-2" v-html="renderHighlightTitle(product.title)"></h3>
-            <div class="flex items-baseline gap-2 mb-2">
-              <span class="text-warm-500 font-bold text-lg">¥{{ product.price }}</span>
-              <span v-if="product.collectCount" class="text-um-muted text-xs">{{ product.collectCount }}收藏</span>
-            </div>
-            <div class="flex items-center justify-between text-xs text-um-muted">
-              <span class="truncate max-w-[48%]">{{ product.sellerName || '未知卖家' }}</span>
-              <span>{{ product.categoryName || '未分类' }}</span>
-            </div>
-            <p class="mt-1 text-xs text-um-muted truncate">{{ formatGoodsCampus(product) }}</p>
-          </div>
-        </div>
+    <div v-if="!showInitialLoading && goodsList.length > 0">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-5">
+        <GoodsCard v-for="product in goodsList" :key="product.productId" :product="product" :pending="collectPendingGoodsIds.has(product.productId)" @select="goToDetail" @collect="toggleCollect(product)" />
       </div>
+
 
       <InfiniteListFooter
         :is-loading-more="isLoadingMore"
@@ -796,4 +783,8 @@ onUnmounted(() => {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+</style>
+
+<style scoped>
+.budget-filter{display:flex;align-items:center;flex-wrap:wrap;gap:10px;font-size:12px;color:#63788b;padding-top:14px;border-top:1px solid #edf2f6}.budget-filter input{width:105px;padding:9px 11px;border:1px solid #d4dfe8;border-radius:8px;background:white}.budget-filter button{padding:9px 13px;border-radius:8px}.budget-apply{background:#173b58;color:white}.budget-error{color:#b32634;width:100%}.budget-applied{width:100%;color:#254b68}@media(max-width:600px){.budget-filter{gap:7px}.budget-filter input{width:90px}.budget-filter button{padding:9px}}
 </style>
