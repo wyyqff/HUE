@@ -24,6 +24,8 @@
 
 复用现有 Element Plus 图片、预览、骨架屏和空状态组件，共用商品卡片；支持价格区间、分类、排序与 URL 保存筛选。首页仅展示真实商品，不用演示商品补位。
 
+当前固定浅色主题，统一中文名称，提供真实分类快捷入口、本机发布草稿、封面选择及原图查看器。无效通知偏好、占位客服、自制弹窗与冗余样式已清理。本轮说明和验证范围见 `docs/2026-09-22-交易体验优化.md`；本轮改动前回退标签为 `hebeu-before-experience-polish-20260922`。
+
 当前开发分支：`hebeu/campus-market-20260922`。精简前基线：`hebeu-before-market-cleanup-20260922`（`6a166a8`）。需要恢复时，先保存当前修改，再用 `git switch -c restore/campus-baseline hebeu-before-market-cleanup-20260922` 创建恢复分支，不强制覆盖当前文件。
 
 ## 许可证

@@ -1,5 +1,9 @@
 import './assets/main.css'
 import 'element-plus/dist/index.css'
+import './assets/experience.css'
+
+// Retire the unused preferences without touching login, school or draft data.
+try { localStorage.removeItem('um:profile-settings') } catch { /* Private browsing. */ }
 
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'

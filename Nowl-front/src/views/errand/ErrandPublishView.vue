@@ -113,7 +113,7 @@ const handlePublish = async () => {
     return
   }
   if (userStore.userInfo?.authStatus !== 2) {
-    ElMessage.warning('请先完成实名认证后再发布跑腿任务')
+    ElMessage.warning('请先完成校园认证后再发布跑腿任务')
     router.push('/profile/auth')
     return
   }

@@ -34,7 +34,7 @@ const iamUserIdModel = computed({
 <template>
   <div class="admin-panel space-y-6">
     <div v-if="!canViewIamRole && !canViewIamUserRole && !canViewIamScope" class="py-16 text-center text-slate-400">
-      当前账号暂无IAM权限中心访问权限
+      当前账号暂无角色与权限访问权限
     </div>
 
     <template v-else>

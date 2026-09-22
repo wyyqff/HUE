@@ -131,25 +131,18 @@ export enum ReviewTargetType {
 /**
  * 物品成色
  */
-export enum ItemCondition {
-  BRAND_NEW = 0,        // 全新
-  LIKE_NEW = 1,         // 几乎全新
-  EXCELLENT = 2,        // 轻微使用痕迹
-  GOOD = 3,             // 使用痕迹明显
-  FAIR = 4,             // 功能正常外观老旧
-  POOR = 5,             // 需要维修
-}
-
-/**
- * 物品成色映射
- */
-export const ITEM_CONDITION_MAP: Record<ItemCondition, { text: string; value: number }> = {
-  [ItemCondition.BRAND_NEW]: { text: '全新', value: 0 },
-  [ItemCondition.LIKE_NEW]: { text: '几乎全新', value: 1 },
-  [ItemCondition.EXCELLENT]: { text: '轻微使用痕迹', value: 2 },
-  [ItemCondition.GOOD]: { text: '使用痕迹明显', value: 3 },
-  [ItemCondition.FAIR]: { text: '功能正常外观老旧', value: 4 },
-  [ItemCondition.POOR]: { text: '需要维修', value: 5 },
+export const ITEM_CONDITION_MAP: Record<number, { text: string; value: number }> = {
+  0: { text: '全新', value: 0 },
+  1: { text: '1成新', value: 1 },
+  2: { text: '2成新', value: 2 },
+  3: { text: '3成新', value: 3 },
+  4: { text: '4成新', value: 4 },
+  5: { text: '5成新', value: 5 },
+  6: { text: '6成新', value: 6 },
+  7: { text: '7成新', value: 7 },
+  8: { text: '8成新', value: 8 },
+  9: { text: '9成新', value: 9 },
+  10: { text: '全新', value: 10 },
 }
 
 /**

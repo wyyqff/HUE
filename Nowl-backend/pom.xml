@@ -8,7 +8,7 @@
     <artifactId>unimarket-backend</artifactId>
     <version>1.0.0</version>
     <packaging>pom</packaging>
-    <name>Nowl Backend</name>
+    <name>Hebei University of Engineering Campus Services</name>
     <description>校园二手交易平台后端系统</description>
 
     <modules>

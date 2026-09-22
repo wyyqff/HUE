@@ -73,7 +73,7 @@ const formatSchoolCampus = (schoolName?: string, schoolCode?: string, campusName
 <template>
   <div class="admin-panel">
     <!-- 搜索栏 -->
-    <div class="flex flex-wrap gap-4 mb-6 p-5 bg-gradient-to-r from-slate-50 to-orange-50/60 rounded-2xl border border-warm-100">
+    <div class="flex flex-wrap gap-4 mb-6 p-5 bg-gradient-to-r from-slate-50 to-warm-50 rounded-2xl border border-warm-100">
       <el-input
         v-model="keywordModel"
         placeholder="搜索用户昵称/手机号..."
@@ -119,7 +119,7 @@ const formatSchoolCampus = (schoolName?: string, schoolCode?: string, campusName
       <button @click="emit('search')" class="px-6 py-2.5 bg-gradient-to-r from-warm-500 to-warm-600 text-white rounded-xl text-sm font-bold hover:shadow-lg hover:shadow-warm-200 transition-all">
         筛选
       </button>
-      <button @click="emit('open-broadcast')" class="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl text-sm font-bold hover:shadow-lg hover:shadow-amber-200 transition-all ml-auto flex items-center gap-1.5">
+      <button @click="emit('open-broadcast')" class="px-6 py-2.5 bg-warm-600 text-white rounded-xl text-sm font-bold hover:shadow-lg hover:shadow-amber-200 transition-all ml-auto flex items-center gap-1.5">
         <Bell :size="16" />
         系统通知
       </button>

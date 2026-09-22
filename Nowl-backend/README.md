@@ -1,4 +1,4 @@
-# Nowl Backend
+# 河北工程大学校园服务后端
 
 后端采用 Spring Boot 多模块结构，入口模块为 `unimarket-web`。
 
@@ -16,4 +16,4 @@ mvn -q -DskipTests compile
 ## 说明
 
 当前 Java 包名和模块名保留 `unimarket` 前缀，以避免大规模重命名带来的兼容性风险；
-对外项目名统一为 `Nowl`。
+页面与文档使用“河北工程大学校园服务”名称，工程目录与已有数据库标识保持兼容。

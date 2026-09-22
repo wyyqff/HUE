@@ -102,7 +102,7 @@ export const createDispute = (data: DisputeCreateParams) => {
   return request.post(DISPUTE_API.CREATE, data)
 }
 
-// 获取我的纠纷列表
+// 获取交易争议列表
 export const getDisputeList = (params: {
   pageNum?: number
   pageSize?: number

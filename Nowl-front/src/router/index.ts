@@ -24,7 +24,7 @@ const adminRouteConfigs = [
   { path: '/admin/errand-manage', name: 'admin-errand-manage', title: '跑腿管理', adminMenu: 'errand-manage' },
   { path: '/admin/dispute-manage', name: 'admin-dispute-manage', title: '纠纷管理', adminMenu: 'dispute-manage' },
   { path: '/admin/risk', name: 'admin-risk-center', title: '风控中心', adminMenu: 'risk-center' },
-  { path: '/admin/iam', name: 'admin-iam-center', title: 'IAM权限中心', adminMenu: 'iam-center' },
+  { path: '/admin/iam', name: 'admin-iam-center', title: '角色与权限', adminMenu: 'iam-center' },
   { path: '/admin/audit', name: 'admin-audit-center', title: '审计中心', adminMenu: 'audit-center' },
   { path: '/admin/search-manage', name: 'admin-search-manage', title: '搜索管理', adminMenu: 'search-manage' },
 ] as const
@@ -43,7 +43,7 @@ const adminRoutes: RouteRecordRaw[] = adminRouteConfigs.map((route) => ({
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
-  scrollBehavior(to) { return to.hash ? { el: to.hash, top: 90, behavior: 'smooth' } : { top: 0 } },
+  scrollBehavior(to, from, savedPosition) { if (savedPosition) return savedPosition; if (to.path === from.path) return false; return to.hash ? { el: to.hash, top: 90, behavior: 'smooth' } : { top: 0 } },
   routes: [
     {
       path: '/',
@@ -56,13 +56,13 @@ const router = createRouter({
       path: '/market',
       name: 'market',
       component: () => import('../views/market/MarketView.vue'),
-      meta: { title: '集市' }, // 公开页面，无需登录
+      meta: { title: '二手集市' }, // 公开页面，无需登录
     },
     {
       path: '/errands',
       name: 'errands',
       component: () => import('../views/errand/ErrandListView.vue'),
-      meta: { title: '跑腿' }, // 公开页面，无需登录
+      meta: { title: '校园跑腿' }, // 公开页面，无需登录
     },
 
     {
@@ -93,7 +93,7 @@ const router = createRouter({
       path: '/publish',
       name: 'publish',
       component: () => import('../views/PublishView.vue'),
-      meta: { title: '发布', requiresAuth: true },
+      meta: { title: '发布闲置', requiresAuth: true },
     },
     {
       path: '/chat',
@@ -116,7 +116,7 @@ const router = createRouter({
       path: '/profile',
       name: 'profile',
       component: () => import('../views/profile/ProfileView.vue'),
-      meta: { title: '我的', requiresAuth: true },
+      meta: { title: '个人中心', requiresAuth: true },
     },
     {
       path: '/profile/edit',
@@ -188,7 +188,7 @@ const router = createRouter({
       path: '/profile/auth',
       name: 'auth',
       component: () => import('../views/profile/AuthView.vue'),
-      meta: { title: '实名认证', requiresAuth: true },
+      meta: { title: '校园认证', requiresAuth: true },
     },
     {
       path: '/profile/runner-apply',
@@ -200,19 +200,19 @@ const router = createRouter({
       path: '/profile/settings',
       name: 'settings',
       component: () => import('../views/profile/SettingsView.vue'),
-      meta: { title: '设置', requiresAuth: true },
+      meta: { title: '账号设置', requiresAuth: true },
     },
     {
       path: '/profile/help',
       name: 'help',
       component: () => import('../views/profile/HelpView.vue'),
-      meta: { title: '帮助中心' }, // 公开页面，无需登录
+      meta: { title: '交易帮助' }, // 公开页面，无需登录
     },
     {
       path: '/profile/blacklist',
       name: 'blacklist',
       component: () => import('../views/profile/BlackListView.vue'),
-      meta: { title: '我的拉黑', requiresAuth: true },
+      meta: { title: '屏蔽名单', requiresAuth: true },
     },
     {
       path: '/admin',
@@ -224,7 +224,7 @@ const router = createRouter({
       path: '/dispute/list',
       name: 'dispute-list',
       component: () => import('../views/dispute/DisputeListView.vue'),
-      meta: { title: '我的纠纷', requiresAuth: true },
+      meta: { title: '交易争议', requiresAuth: true },
     },
     {
       path: '/dispute/create',
@@ -257,7 +257,7 @@ const router = createRouter({
 // 路由守卫
 router.beforeEach(async (to, from, next) => {
   // 固定站点标题，避免按路由动态变化
-  document.title = '河北工程大学校园服务'
+  document.title = `${to.meta.title || '校园服务'} · 河北工程大学`
 
   // 检查是否需要登录
   if (to.meta.requiresAuth) {

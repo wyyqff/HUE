@@ -1,192 +1,151 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import {
-  BookOpenText,
-  ChevronRight,
-  CircleCheckBig,
-  FileText,
-  HelpCircle,
-  MessageCircle,
-  Phone,
-  Scale,
-  ShieldAlert,
-} from 'lucide-vue-next'
-import { ElMessage } from '@/utils/feedback'
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElCollapse, ElCollapseItem, ElButton } from 'element-plus'
+import { BookOpen, Camera, MessagesSquare, Handshake } from 'lucide-vue-next'
 import SubPageShell from '@/components/SubPageShell.vue'
-
-const openIndex = ref(0)
-
-const flowSteps = [
-  '订单处于待确认收货阶段时，优先与对方协商（必要时可申请退款）',
-  '协商无果可发起纠纷并提交证据（资金仍由平台托管）',
-  '双方最多各补充 3 次说明与图片',
-  '平台结合证据给出最终裁定（可裁定扣分与退款金额）',
-  '裁定完成后纠纷完结，订单进入已结束状态',
+const router = useRouter()
+const open = ref('publish')
+const steps = [
+  { title: '拍清楚，说清楚', text: '展示商品实拍、成色、瑕疵和配件，自主定价。', icon: Camera },
+  { title: '站内聊，约面交', text: '先确认商品情况，再约校内公共地点见面。', icon: MessagesSquare },
+  { title: '先验货，再确认', text: '检查功能和外观，确认无误后完成订单。', icon: Handshake },
 ]
-
-const faqList = [
+const questions = [
   {
-    title: '如何申请退款？',
-    content:
-      '订单处于待发货/待收货时，可在“我的订单”发起退款。部分高信用场景支持极速退款，其余由卖家处理或系统超时自动退款。',
+    id: 'publish',
+    title: '如何发布闲置商品？',
+    text: '完成校园认证后，进入“发布闲置”，添加实拍图片、标题、分类、成色和价格。详细说明瑕疵与配件，提交后可在“我的商品”查看审核状态。未填写完的内容可保存为本机草稿。',
   },
   {
-    title: '什么情况下应该发起纠纷？',
-    content:
-      '当订单处于待确认收货（资金托管中）且存在履约争议时，可发起纠纷并上传最多 9 张证据图；跑腿纠纷需为任务参与方且任务已被接单。',
+    id: 'search',
+    title: '如何更快找到想要的商品？',
+    text: '在“二手集市”输入关键词，按分类、预算和排序缩小范围。筛选条件会保留在网址中，刷新后可以继续浏览；点击“清空筛选”恢复全部结果。',
   },
   {
-    title: '纠纷处理流程多久有结果？',
-    content:
-      '纠纷提交后进入审核队列，双方补充材料后由管理员结合证据处理。复杂案例会延长处理时长，请留意通知。',
+    id: 'meet',
+    title: '面交前需要确认什么？',
+    text: '通过“联系卖家”确认型号、功能、瑕疵、配件及价格。建议在校内公共场所碰面，现场检查后再确认收货，聊天和订单信息可留作交易凭据。',
   },
   {
-    title: '平台如何保障交易资金？',
-    content:
-      '买家支付后资金由平台托管，确认收货后结算给卖家；退款成立时将按裁定直接返还买家账户。',
+    id: 'orders',
+    title: '订单、退款和交易争议在哪里处理？',
+    text: '在个人中心的“我买到的”或“我卖出的”查看订单，按当前订单显示的操作处理付款、交付、收货或退款。协商未能解决时，按订单中的争议入口提交事实说明与证据，在“交易争议”查看处理进度。',
   },
   {
-    title: '如何提高纠纷通过率？',
-    content:
-      '建议上传清晰、可核验的证据，说明要包含时间、商品/任务信息及争议点，避免只给结论不提供过程。',
+    id: 'images',
+    title: '如何查看商品细节？',
+    text: '在商品详情点击图片可打开大图，支持缩放、旋转和切换。发布图片不会在前端压缩，请使用清晰实拍图，避免过度滤镜。',
+  },
+  {
+    id: 'panorama',
+    title: '校园实景导览如何使用？',
+    text: '首页下方可以搜索校园场景并在本站打开学校全景。全景固定从主广场进入，进入后在画面内选择对应场景；需要保持联网。',
   },
 ]
-
-const fallbackFaq = {
-  title: '常见问题',
-  content: '内容建设中',
-}
-
-const openedFaq = computed(() => faqList[openIndex.value] ?? faqList[0] ?? fallbackFaq)
-
-const openCustomerService = () => {
-  ElMessage.info('在线客服接入中，建议先查看调解流程与常见问题')
-}
-
-const callService = () => {
-  ElMessage.info('服务热线：400-123-4567（工作日 9:00-18:00）')
-}
-
-const openDoc = (name: string) => {
-  ElMessage.info(`${name}正在整理中，稍后上线`)
-}
 </script>
-
 <template>
-  <SubPageShell title="校园调解帮助中心" subtitle="退款、纠纷与资金保障说明" back-to="/profile" max-width="lg" :use-card="false">
-    <template #icon>
-      <HelpCircle class="text-white w-8 h-8" stroke-width="2.5" />
-    </template>
-
-    <div class="space-y-4 pb-4">
-      <section class="um-card p-5 bg-gradient-to-r from-warm-50 via-orange-50 to-amber-50 border border-warm-100">
-        <div class="flex items-start gap-3">
-          <ShieldAlert class="w-6 h-6 text-warm-500 mt-0.5 shrink-0" />
-          <div class="min-w-0">
-            <h2 class="font-bold text-slate-800">遇到交易争议？先看这一页</h2>
-            <p class="text-sm text-slate-600 mt-1 leading-relaxed">
-              出现退款、履约或证据分歧时，建议先在订单/跑腿详情页协商与申请退款，再进入纠纷流程。准备好清晰证据能显著提升处理效率。
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <div class="grid md:grid-cols-2 gap-4">
-        <section class="um-card p-5">
-          <h3 class="font-semibold text-slate-800 mb-3 inline-flex items-center gap-2">
-            <Scale :size="16" class="text-warm-500" />
-            调解流程
-          </h3>
-          <ol class="space-y-2 text-sm text-slate-600">
-            <li
-              v-for="(item, index) in flowSteps"
-              :key="item"
-              class="flex items-start gap-2.5"
-            >
-              <CircleCheckBig class="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
-              <span>{{ index + 1 }}. {{ item }}</span>
-            </li>
-          </ol>
-        </section>
-
-        <section class="um-card p-5">
-          <h3 class="font-semibold text-slate-800 mb-3 inline-flex items-center gap-2">
-            <BookOpenText :size="16" class="text-warm-500" />
-            常用入口
-          </h3>
-          <div class="space-y-2.5">
-            <button
-              @click="openCustomerService"
-              class="w-full text-left rounded-xl border border-slate-100 bg-slate-50 px-3 py-3 hover:border-warm-200 hover:bg-warm-50 transition-colors"
-            >
-              <div class="flex items-center justify-between gap-3">
-                <div class="flex items-center gap-3 min-w-0">
-                  <MessageCircle class="w-5 h-5 text-warm-500 shrink-0" />
-                  <div class="min-w-0">
-                    <p class="text-sm font-medium text-slate-700">在线客服</p>
-                    <p class="text-xs text-slate-400">工作日 9:00-18:00</p>
-                  </div>
-                </div>
-                <ChevronRight :size="15" class="text-slate-400" />
-              </div>
-            </button>
-
-            <button
-              @click="callService"
-              class="w-full text-left rounded-xl border border-slate-100 bg-slate-50 px-3 py-3 hover:border-warm-200 hover:bg-warm-50 transition-colors"
-            >
-              <div class="flex items-center justify-between gap-3">
-                <div class="flex items-center gap-3 min-w-0">
-                  <Phone class="w-5 h-5 text-warm-500 shrink-0" />
-                  <div class="min-w-0">
-                    <p class="text-sm font-medium text-slate-700">电话咨询</p>
-                    <p class="text-xs text-slate-400">400-123-4567</p>
-                  </div>
-                </div>
-                <ChevronRight :size="15" class="text-slate-400" />
-              </div>
-            </button>
-          </div>
-        </section>
-      </div>
-
-      <section class="um-card p-5">
-        <h3 class="font-semibold text-slate-800 mb-4">常见问题</h3>
-
-        <div class="flex flex-wrap gap-2 mb-4">
-          <button
-            v-for="(item, index) in faqList"
-            :key="item.title"
-            @click="openIndex = index"
-            class="px-3 py-1.5 rounded-full text-xs transition-colors"
-            :class="openIndex === index ? 'bg-warm-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
-          >
-            {{ item.title }}
-          </button>
-        </div>
-
-        <div class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-          <h4 class="font-medium text-slate-700">{{ openedFaq.title }}</h4>
-          <p class="text-sm text-slate-600 leading-relaxed mt-2">{{ openedFaq.content }}</p>
-        </div>
-      </section>
-
-      <section class="um-card p-4">
-        <div class="flex flex-wrap items-center justify-center gap-5 text-xs text-slate-500">
-          <button class="hover:text-slate-700 inline-flex items-center gap-1" @click="openDoc('用户协议')">
-            <FileText :size="13" />
-            用户协议
-          </button>
-          <button class="hover:text-slate-700 inline-flex items-center gap-1" @click="openDoc('隐私政策')">
-            <FileText :size="13" />
-            隐私政策
-          </button>
-          <button class="hover:text-slate-700 inline-flex items-center gap-1" @click="openDoc('社区规范')">
-            <FileText :size="13" />
-            社区规范
-          </button>
-        </div>
-      </section>
+  <SubPageShell
+    title="交易帮助"
+    subtitle="从发布闲置到当面交付，每一步都清楚"
+    back-to="/profile"
+    max-width="lg"
+    :use-card="false"
+  >
+    <template #icon><BookOpen class="w-8 h-8 text-white" /></template>
+    <div class="help-steps">
+      <article v-for="(step, index) in steps" :key="step.title" class="um-card">
+        <component :is="step.icon" :size="25" /><small>0{{ index + 1 }}</small>
+        <h2>{{ step.title }}</h2>
+        <p>{{ step.text }}</p>
+      </article>
+    </div>
+    <section class="um-card help-faq">
+      <h2>常见问题</h2>
+      <ElCollapse v-model="open" accordion
+        ><ElCollapseItem
+          v-for="item in questions"
+          :key="item.id"
+          :name="item.id"
+          :title="item.title"
+          ><p>{{ item.text }}</p></ElCollapseItem
+        ></ElCollapse
+      >
+    </section>
+    <div class="help-actions">
+      <ElButton type="primary" @click="router.push('/market')">逛二手集市</ElButton
+      ><ElButton @click="router.push('/profile/my-orders')">查看我的订单</ElButton>
     </div>
   </SubPageShell>
 </template>
+<style scoped>
+.help-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.help-steps article {
+  padding: 24px;
+  position: relative;
+}
+.help-steps svg {
+  color: var(--um-primary);
+}
+.help-steps small {
+  position: absolute;
+  right: 22px;
+  top: 22px;
+  color: #a9b9c7;
+  font-size: 20px;
+}
+.help-steps h2 {
+  font-size: 16px;
+  margin: 20px 0 10px;
+}
+.help-steps p,
+.help-faq p {
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--um-muted);
+}
+.help-faq {
+  padding: 24px;
+}
+.help-faq h2 {
+  font-size: 18px;
+  margin-bottom: 18px;
+}
+.help-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 24px;
+}
+.help-faq :deep(.el-collapse-item__header) {
+  font-size: 14px;
+  font-weight: 600;
+  height: auto;
+  min-height: 56px;
+  line-height: 1.6;
+  gap: 12px;
+}
+.help-faq :deep(.el-collapse) {
+  --el-collapse-border-color: #e8eef3;
+}
+@media (max-width: 600px) {
+  .help-steps {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .help-steps article {
+    padding: 20px;
+  }
+  .help-steps h2 {
+    margin-top: 12px;
+  }
+  .help-faq {
+    padding: 18px;
+  }
+}
+</style>

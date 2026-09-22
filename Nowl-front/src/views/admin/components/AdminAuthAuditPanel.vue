@@ -49,7 +49,7 @@ const collectPreviewImages = (certImage?: string, selfImage?: string) => {
 <template>
   <div class="admin-panel">
     <!-- 筛选栏 -->
-    <div class="flex gap-4 mb-6 p-5 bg-gradient-to-r from-slate-50 to-orange-50/60 rounded-2xl border border-warm-100">
+    <div class="flex gap-4 mb-6 p-5 bg-gradient-to-r from-slate-50 to-warm-50 rounded-2xl border border-warm-100">
       <el-select
         v-model="schoolCodeModel"
         @change="emit('school-change')"

@@ -86,7 +86,7 @@ export interface ErrandSearchRequestDTO {
   campusCode?: string
   minReward?: number
   maxReward?: number
-  sortType?: number // 0-综合 1-最新 2-赏金升序 3-赏金降序
+  sortType?: number // 0-综合 1-最新 2-报酬升序 3-报酬降序
   pageNum?: number
   pageSize?: number
 }

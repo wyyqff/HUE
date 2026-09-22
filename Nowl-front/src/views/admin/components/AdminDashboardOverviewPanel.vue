@@ -141,7 +141,7 @@ const emit = defineEmits<{
     </div>
 
     <!-- 用户统计 -->
-    <div class="bg-gradient-to-br from-slate-50 to-orange-50/60 rounded-2xl p-6 border border-warm-100">
+    <div class="bg-gradient-to-br from-slate-50 to-warm-50 rounded-2xl p-6 border border-warm-100">
       <h3 class="font-bold text-slate-700 mb-5 flex items-center gap-2">
         <div class="w-8 h-8 bg-warm-100 rounded-lg flex items-center justify-center">
           <Users :size="16" class="text-warm-600" />

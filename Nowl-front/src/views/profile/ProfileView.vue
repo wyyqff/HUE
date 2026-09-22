@@ -124,7 +124,7 @@ const quickEntries = computed<QuickEntry[]>(() => [
   },
   {
     icon: AlertTriangle,
-    title: '我的纠纷',
+    title: '交易争议',
     description: '退款争议与处理进度',
     route: '/dispute/list',
   },
@@ -136,19 +136,19 @@ const quickEntries = computed<QuickEntry[]>(() => [
   },
   {
     icon: Ban,
-    title: '我的拉黑',
+    title: '屏蔽名单',
     description: '屏蔽用户管理',
     route: '/profile/blacklist',
   },
   {
     icon: BellRing,
-    title: '通知与偏好设置',
-    description: '通知、主题、安全',
+    title: '账号设置',
+    description: '个人资料与账号安全',
     route: '/profile/settings',
   },
   {
     icon: HelpCircle,
-    title: '校园调解帮助中心',
+    title: '交易帮助',
     description: '退款与纠纷处理指南',
     route: '/profile/help',
   },
@@ -222,7 +222,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <SubPageShell title="我的主页" subtitle="管理账号、交易与互动记录" max-width="lg" :use-card="false" :show-back="false">
+  <SubPageShell title="个人中心" subtitle="管理账号、交易与互动记录" max-width="lg" :use-card="false" :show-back="false">
     <template #icon>
       <UserCog class="text-white w-8 h-8" stroke-width="2.5" />
     </template>

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
+import { ElBacktop, ElConfigProvider } from 'element-plus'
+import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import { Check, ChevronDown, LogOut, MapPin, Plus, User } from 'lucide-vue-next'
 
 import { useUserStore } from '@/stores/user'
@@ -23,7 +25,6 @@ const tabRouteMap = {
   home: '/',
   market: '/market',
   errands: '/errands',
-  chat: '/chat',
   message: '/message',
 } as const
 
@@ -112,7 +113,7 @@ const handleLogout = async () => {
 const activeTab = computed(() => (route.name as string) || 'market')
 const showLayout = computed(() => !route.meta.hideLayout)
 const showTopNav = computed(() =>
-  showLayout.value && ['home', 'market', 'errands', 'chat', 'message', 'profile', 'user-chat'].includes(activeTab.value),
+  showLayout.value && ['home', 'market', 'errands', 'message', 'profile', 'user-chat'].includes(activeTab.value),
 )
 
 const mainContentClass = computed(() => {
@@ -286,6 +287,7 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <ElConfigProvider :locale="zhCn">
   <div class="um-theme antialiased">
     <header v-if="showTopNav" class="proto-header">
       <div class="proto-header-inner">
@@ -301,10 +303,10 @@ onUnmounted(() => {
             首页
           </button>
           <button type="button" class="nav-item" :class="{ active: isNavActive('market') }" @click="navigateTo('market')">
-            集市
+            二手集市
           </button>
           <button type="button" class="nav-item" :class="{ active: isNavActive('errands') }" @click="navigateTo('errands')">
-            跑腿
+            校园跑腿
           </button>
           <button type="button" class="nav-item message-item" :class="{ active: isNavActive('message') }" @click="navigateTo('message')">
             消息
@@ -321,7 +323,7 @@ onUnmounted(() => {
             <Transition name="dropdown-fade">
               <div v-if="showPublishPopover" class="publish-dropdown">
                 <button type="button" class="publish-item" @click="navigateWithAuth('/publish')">
-                  发布商品
+                  发布闲置
                 </button>
                 <button type="button" class="publish-item" @click="navigateWithAuth('/errand/publish')">
                   发布跑腿
@@ -408,7 +410,7 @@ onUnmounted(() => {
                 </div>
                 <div class="profile-divider"></div>
                 <div class="profile-quick-grid">
-                  <button type="button" class="profile-quick-item" @click="navigateWithAuth('/profile')">我的主页</button>
+                  <button type="button" class="profile-quick-item" @click="navigateWithAuth('/profile')">个人中心</button>
                   <button type="button" class="profile-quick-item" @click="navigateWithAuth('/profile/my-orders')">我的订单</button>
                   <button type="button" class="profile-quick-item" @click="navigateWithAuth('/profile/my-goods')">我的商品</button>
                   <button type="button" class="profile-quick-item" @click="navigateWithAuth('/profile/my-errands')">我的跑腿</button>
@@ -435,9 +437,13 @@ onUnmounted(() => {
     </header>
 
     <main :class="mainContentClass">
-      <RouterView />
+      <RouterView v-slot="{ Component }">
+        <Transition name="page" mode="out-in"><component :is="Component" :key="route.path" /></Transition>
+      </RouterView>
     </main>
+    <ElBacktop v-if="!['user-chat', 'product-detail'].includes(activeTab)" :right="20" :bottom="28" :visibility-height="500" title="返回顶部" aria-label="返回顶部" />
   </div>
+  </ElConfigProvider>
 </template>
 
 <style scoped>
@@ -512,12 +518,6 @@ onUnmounted(() => {
   color: var(--um-accent);
 }
 
-.ai-helper {
-  background: linear-gradient(135deg, var(--um-primary), var(--um-accent));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  font-weight: 700;
-}
 
 .logo-area:focus-visible,
 .nav-item:focus-visible,

@@ -23,7 +23,7 @@ const router = useRouter()
 const userStore = useUserStore()
 const pageSize = PAGE_CONSTANTS.LARGE_PAGE_SIZE
 const searchKeyword = ref('')
-const sortType = ref(0) // 0-综合 1-最新 2-赏金最低 3-赏金最高
+const sortType = ref(0) // 0-综合 1-最新 2-报酬最低 3-报酬最高
 const listAnchor = ref<HTMLElement | null>(null)
 const refreshButtonSpinning = ref(false)
 
@@ -39,8 +39,8 @@ const errandQueryParams = computed(() => ({
 const sortOptions = [
   { value: 0, label: '综合' },
   { value: 1, label: '最新' },
-  { value: 2, label: '赏金最低' },
-  { value: 3, label: '赏金最高' },
+  { value: 2, label: '报酬最低' },
+  { value: 3, label: '报酬最高' },
 ]
 
 const selectSort = (value: number) => {
@@ -63,7 +63,7 @@ const ensureRunnerApproved = () => {
   }
 
   if (userStore.userInfo?.authStatus !== AuthStatus.APPROVED) {
-    ElMessage.warning('请先完成实名认证')
+    ElMessage.warning('请先完成校园认证')
     router.push('/profile/auth')
     return false
   }
@@ -246,7 +246,7 @@ const handleRunnerEntry = () => {
     return
   }
   if (userStore.userInfo?.authStatus !== AuthStatus.APPROVED) {
-    ElMessage.warning('请先完成实名认证')
+    ElMessage.warning('请先完成校园认证')
     router.push('/profile/auth')
     return
   }

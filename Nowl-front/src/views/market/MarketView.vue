@@ -90,7 +90,6 @@ function clearFilters() {
 
 // 排序相关
 const sortType = ref(0) // 0-综合 1-最新 2-价格升序 3-价格降序 4-热度
-const showSortDropdown = ref(false)
 const sortOptions = [
   { value: 0, label: '综合排序' },
   { value: 1, label: '最新发布' },
@@ -414,7 +413,6 @@ const selectSecondCategory = (categoryId: number | undefined) => {
 const selectSort = (type: number) => {
   sortType.value = type
   isSearchMode.value = !!searchKeyword.value || !!selectedFirstCategoryId.value || !!selectedSecondCategoryId.value || type !== 0 || minPrice.value !== '' || maxPrice.value !== ''
-  showSortDropdown.value = false
   pageNum.value = 1
   refresh()
 }
@@ -481,13 +479,6 @@ const handleSearchBlur = () => {
   }, 200)
 }
 
-// 点击页面其他地方关闭下拉
-const handleClickOutside = (e: MouseEvent) => {
-  const target = e.target as HTMLElement
-  if (!target.closest('.sort-dropdown-container')) {
-    showSortDropdown.value = false
-  }
-}
 
 onMounted(() => {
   isSearchMode.value = !!searchKeyword.value
@@ -497,12 +488,10 @@ onMounted(() => {
   fetchCategories()
   fetchHotWords()
   refresh(pageNum.value)
-  document.addEventListener('click', handleClickOutside)
 })
 
 onUnmounted(() => {
   // 清理事件监听器
-  document.removeEventListener('click', handleClickOutside)
 
   // 清理定时器
   if (suggestionTimer) {
@@ -528,7 +517,7 @@ onUnmounted(() => {
           <input
             v-model="searchKeyword"
             type="text"
-            placeholder="搜索你想要的宝贝..."
+            placeholder="搜索教材、数码、生活用品…"
             class="flex-1 bg-transparent outline-none text-sm text-um-text placeholder:text-um-muted"
             @focus="handleSearchFocus"
             @blur="handleSearchBlur"

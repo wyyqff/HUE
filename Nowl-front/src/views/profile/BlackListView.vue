@@ -93,7 +93,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <SubPageShell title="我的拉黑" subtitle="管理已屏蔽用户" back-to="/profile" max-width="lg" :use-card="false">
+  <SubPageShell title="屏蔽名单" subtitle="管理已屏蔽用户" back-to="/profile" max-width="lg" :use-card="false">
     <div class="space-y-4">
       <section class="um-card p-4 md:p-5 space-y-3">
         <div class="flex items-center justify-between gap-3 flex-wrap">

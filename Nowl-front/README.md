@@ -1,4 +1,4 @@
-# Nowl Frontend
+# 河北工程大学校园服务前端
 
 前端项目（Vue 3 + TypeScript + Vite）。
 

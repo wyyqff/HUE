@@ -9,15 +9,19 @@ import {
   ShieldCheck,
   ShoppingBag,
   ChevronLeft,
-  ChevronRight,
   Package,
   AlertTriangle,
   Sparkles,
   Maximize2,
-  X,
   Trash2,
 } from 'lucide-vue-next'
-import { getGoodsDetail, collectGoods, uncollectGoods, offshelfGoods, deleteGoods } from '@/api/modules/goods'
+import {
+  getGoodsDetail,
+  collectGoods,
+  uncollectGoods,
+  offshelfGoods,
+  deleteGoods,
+} from '@/api/modules/goods'
 import { createOrder } from '@/api/modules/order'
 import { getSimilarRecommend, recordViewBehavior } from '@/api/modules/recommend'
 import { useUserStore } from '@/stores/user'
@@ -27,18 +31,10 @@ import { normalizeMediaUrl } from '@/utils/media'
 import type { GoodsInfo, RecommendItemVO } from '@/types'
 import { TradeStatus, ReviewStatus } from '@/constants'
 import dayjs from 'dayjs'
+import { ElImageViewer } from 'element-plus'
 
 interface ProductDetail extends GoodsInfo {
   images?: string[]
-}
-
-const CONDITION_LABELS: Record<number, string> = {
-  0: '全新',
-  1: '几乎全新',
-  2: '轻微使用痕迹',
-  3: '使用痕迹明显',
-  4: '功能正常外观老旧',
-  5: '需要维修',
 }
 
 const router = useRouter()
@@ -47,7 +43,9 @@ const userStore = useUserStore()
 
 const productId = computed(() => Number(route.params.id))
 const sourceOrderId = computed(() => {
-  const raw = Array.isArray(route.query.fromOrderId) ? route.query.fromOrderId[0] : route.query.fromOrderId
+  const raw = Array.isArray(route.query.fromOrderId)
+    ? route.query.fromOrderId[0]
+    : route.query.fromOrderId
   const parsed = Number(raw)
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null
 })
@@ -58,7 +56,6 @@ const currentImageIndex = ref(0)
 const showImagePreview = ref(false)
 const previewImageIndex = ref(0)
 const deletingLoading = ref(false)
-let previewClosedAt = 0
 
 // 操作 loading 状态（防止重复提交）
 const collectingLoading = ref(false)
@@ -89,9 +86,9 @@ const parseImages = (detail: ProductDetail): string[] => {
       // 兼容早期逗号分隔格式
       detail.imageList
         .split(',')
-        .map(item => item.trim())
+        .map((item) => item.trim())
         .filter(Boolean)
-        .forEach(item => candidates.push(item))
+        .forEach((item) => candidates.push(item))
     }
   }
 
@@ -102,7 +99,7 @@ const parseImages = (detail: ProductDetail): string[] => {
   return Array.from(
     new Set(
       candidates
-        .map(item => normalizeMediaUrl(item))
+        .map((item) => normalizeMediaUrl(item))
         .filter((item): item is string => Boolean(item)),
     ),
   )
@@ -110,17 +107,21 @@ const parseImages = (detail: ProductDetail): string[] => {
 
 const productImages = computed(() => product.value?.images ?? [])
 const currentImage = computed(() => productImages.value[currentImageIndex.value] ?? '')
-const previewImage = computed(() => productImages.value[previewImageIndex.value] ?? '')
 const hasMultiImages = computed(() => productImages.value.length > 1)
 
 const conditionText = computed(() => {
   if (!product.value) return '未知成色'
-  return CONDITION_LABELS[product.value.itemCondition] ?? `${product.value.itemCondition}成新`
+  const condition = Number(product.value.itemCondition)
+  return condition === 10 || condition === 0
+    ? '全新'
+    : condition >= 1 && condition <= 9
+      ? `${condition}成新`
+      : '成色待沟通'
 })
 
 const tradeTypeText = computed(() => {
-  const map: Record<number, string> = { 0: '仅支持自提', 1: '仅支持邮寄', 2: '支持自提/邮寄' }
-  return product.value ? map[product.value.tradeType] ?? '交易方式待沟通' : ''
+  const map: Record<number, string> = { 0: '校内面交', 1: '快递邮寄', 2: '面交或邮寄' }
+  return product.value ? (map[product.value.tradeType] ?? '交易方式待沟通') : ''
 })
 
 const tradeStatusText = computed(() => {
@@ -163,7 +164,8 @@ const tradeStatusStyle = computed(() => {
     }
   }
 
-  if (tradeStatus === TradeStatus.ON_SALE) return 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+  if (tradeStatus === TradeStatus.ON_SALE)
+    return 'bg-emerald-50 text-emerald-700 border border-emerald-100'
   if (tradeStatus === TradeStatus.OFF_SHELF) return 'bg-red-50 text-red-600 border border-red-100'
   return 'bg-slate-100 text-slate-500 border border-slate-200'
 })
@@ -181,23 +183,32 @@ const canSellerEdit = computed(() => {
   if (!isSeller.value || !product.value) return false
   const status = product.value.tradeStatus
   const reviewStatus = product.value.reviewStatus
-  const rejectedAndOffShelf = reviewStatus === ReviewStatus.REJECTED && status === TradeStatus.OFF_SHELF
+  const rejectedAndOffShelf =
+    reviewStatus === ReviewStatus.REJECTED && status === TradeStatus.OFF_SHELF
   return (status === TradeStatus.ON_SALE && isReviewPassed(reviewStatus)) || rejectedAndOffShelf
 })
 
 const canSellerOffShelf = computed(() => {
   if (!isSeller.value || !product.value) return false
-  return product.value.tradeStatus === TradeStatus.ON_SALE && isReviewPassed(product.value.reviewStatus)
+  return (
+    product.value.tradeStatus === TradeStatus.ON_SALE && isReviewPassed(product.value.reviewStatus)
+  )
 })
 
 const canSellerRelist = computed(() => {
   if (!isSeller.value || !product.value) return false
-  return product.value.tradeStatus === TradeStatus.OFF_SHELF && isReviewPassed(product.value.reviewStatus)
+  return (
+    product.value.tradeStatus === TradeStatus.OFF_SHELF &&
+    isReviewPassed(product.value.reviewStatus)
+  )
 })
 
 const canSellerDelete = computed(() => {
   if (!isSeller.value || !product.value) return false
-  return product.value.tradeStatus === TradeStatus.OFF_SHELF || product.value.reviewStatus === ReviewStatus.REJECTED
+  return (
+    product.value.tradeStatus === TradeStatus.OFF_SHELF ||
+    product.value.reviewStatus === ReviewStatus.REJECTED
+  )
 })
 
 const sellerPrimaryActionText = computed(() => {
@@ -268,8 +279,12 @@ const fetchSimilarProducts = async () => {
 }
 
 // 记录浏览行为
-const recordView = async (targetProductId = productId.value, targetCategoryId = product.value?.categoryId) => {
-  if (!Number.isFinite(targetProductId) || !Number.isFinite(targetCategoryId) || viewStartTime <= 0) return
+const recordView = async (
+  targetProductId = productId.value,
+  targetCategoryId = product.value?.categoryId,
+) => {
+  if (!Number.isFinite(targetProductId) || !Number.isFinite(targetCategoryId) || viewStartTime <= 0)
+    return
   viewDuration = Math.floor((Date.now() - viewStartTime) / 1000)
   if (viewDuration <= 0) return
 
@@ -293,23 +308,9 @@ const switchImage = (index: number) => {
 }
 
 const openImagePreview = (index = currentImageIndex.value) => {
-  if (Date.now() - previewClosedAt < 220) return
   if (!productImages.value.length) return
   previewImageIndex.value = index
   showImagePreview.value = true
-}
-
-const closeImagePreview = () => {
-  showImagePreview.value = false
-  previewClosedAt = Date.now()
-}
-
-const movePreview = (direction: -1 | 1) => {
-  const total = productImages.value.length
-  if (!total) return
-  const next = (previewImageIndex.value + direction + total) % total
-  previewImageIndex.value = next
-  currentImageIndex.value = next
 }
 
 // 收藏/取消收藏
@@ -395,7 +396,7 @@ const handleChat = () => {
 }
 
 const handleShare = async () => {
-  const shareUrl = typeof window !== 'undefined' ? window.location.href : route.fullPath
+  const shareUrl = new URL(`/product/${productId.value}`, window.location.origin).href
   try {
     if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(shareUrl)
@@ -486,29 +487,6 @@ const handleRelist = () => {
   })
 }
 
-const handlePreviewKeydown = (event: KeyboardEvent) => {
-  if (!showImagePreview.value) return
-  if (event.key === 'Escape') {
-    closeImagePreview()
-    return
-  }
-  if (event.key === 'ArrowLeft') {
-    event.preventDefault()
-    movePreview(-1)
-    return
-  }
-  if (event.key === 'ArrowRight') {
-    event.preventDefault()
-    movePreview(1)
-  }
-}
-
-watch(currentImageIndex, (nextIndex) => {
-  if (showImagePreview.value) {
-    previewImageIndex.value = nextIndex
-  }
-})
-
 watch(
   () => productId.value,
   async (newId, oldId) => {
@@ -521,11 +499,9 @@ watch(
 
 onMounted(() => {
   void fetchProductDetail()
-  window.addEventListener('keydown', handlePreviewKeydown)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', handlePreviewKeydown)
   void recordView()
 })
 </script>
@@ -538,14 +514,21 @@ onUnmounted(() => {
           <ChevronLeft :size="20" class="text-um-muted" />
         </button>
         <div class="text-sm font-bold text-um-text tracking-wide">商品详情</div>
-        <button @click="handleShare" class="um-icon-btn" aria-label="分享商品">
+        <button
+          @click="handleShare"
+          class="um-icon-btn"
+          aria-label="复制商品链接"
+          title="复制商品链接"
+        >
           <Share2 :size="18" class="text-um-muted" />
         </button>
       </div>
     </header>
 
     <div v-if="loading" class="flex items-center justify-center py-24">
-      <div class="animate-spin rounded-full h-9 w-9 border-2 border-warm-500 border-t-transparent"></div>
+      <div
+        class="animate-spin rounded-full h-9 w-9 border-2 border-warm-500 border-t-transparent"
+      ></div>
     </div>
 
     <div v-else-if="product" class="max-w-6xl mx-auto px-4 py-6 md:py-10 space-y-6">
@@ -557,7 +540,9 @@ onUnmounted(() => {
           <AlertTriangle :size="22" class="text-red-500 mt-0.5 flex-shrink-0" />
           <div class="flex-1 min-w-0">
             <h3 class="font-bold text-red-700">商品审核未通过</h3>
-            <p class="text-sm text-red-600 mt-1 leading-relaxed">{{ product.auditReason || '包含违规内容' }}</p>
+            <p class="text-sm text-red-600 mt-1 leading-relaxed">
+              {{ product.auditReason || '包含违规内容' }}
+            </p>
             <button
               v-if="canSellerEdit"
               @click="handleEdit"
@@ -577,7 +562,7 @@ onUnmounted(() => {
           <ShieldCheck :size="22" class="text-yellow-600 mt-0.5 flex-shrink-0" />
           <div>
             <h3 class="font-bold text-yellow-700">商品正在审核中</h3>
-            <p class="text-sm text-yellow-700/90 mt-1">系统正在进行智能审核，请耐心等待。</p>
+            <p class="text-sm text-yellow-700/90 mt-1">商品已提交审核，结果将通过消息通知。</p>
           </div>
         </div>
       </section>
@@ -590,14 +575,16 @@ onUnmounted(() => {
           <ShieldCheck :size="22" class="text-orange-600 mt-0.5 flex-shrink-0" />
           <div>
             <h3 class="font-bold text-orange-700">商品待人工复核</h3>
-            <p class="text-sm text-orange-700/90 mt-1">AI 检测到可能风险，已转交人工审核，请耐心等待。</p>
+            <p class="text-sm text-orange-700/90 mt-1">商品需要进一步核实，请等待审核结果。</p>
           </div>
         </div>
       </section>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10 items-start">
         <section class="space-y-3">
-          <div class="relative overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+          <div
+            class="relative overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
+          >
             <button
               type="button"
               class="w-full aspect-[4/3] block bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-warm-400"
@@ -611,14 +598,19 @@ onUnmounted(() => {
                 loading="eager"
                 decoding="async"
               />
-              <div v-else class="w-full h-full flex flex-col items-center justify-center gap-2 text-slate-400">
+              <div
+                v-else
+                class="w-full h-full flex flex-col items-center justify-center gap-2 text-slate-400"
+              >
                 <Package :size="28" />
                 <span class="text-sm">暂无商品图片</span>
               </div>
             </button>
 
             <div class="pointer-events-none absolute left-3 top-3 flex items-center gap-2">
-              <span class="rounded-full px-3 py-1 text-xs font-bold bg-white/95 border border-slate-200 text-slate-700">
+              <span
+                class="rounded-full px-3 py-1 text-xs font-bold bg-white/95 border border-slate-200 text-slate-700"
+              >
                 {{ tradeStatusText }}
               </span>
               <span
@@ -642,24 +634,25 @@ onUnmounted(() => {
               v-if="product.tradeStatus !== TradeStatus.ON_SALE"
               class="absolute inset-0 bg-black/55 backdrop-blur-[1px] flex items-center justify-center"
             >
-              <span class="text-white font-bold text-lg md:text-xl px-6 py-2 border border-white/70 rounded-full">
+              <span
+                class="text-white font-bold text-lg md:text-xl px-6 py-2 border border-white/70 rounded-full"
+              >
                 {{ tradeStatusText }}
               </span>
             </div>
           </div>
 
-          <div
-            v-if="hasMultiImages"
-            class="flex gap-3 overflow-x-auto no-scrollbar py-1"
-          >
+          <div v-if="hasMultiImages" class="flex gap-3 overflow-x-auto no-scrollbar py-1">
             <button
               v-for="(img, idx) in productImages"
               :key="`${img}-${idx}`"
               @click="switchImage(idx)"
               class="relative w-20 h-20 md:w-24 md:h-24 flex-shrink-0 rounded-2xl overflow-hidden border-2 transition-all"
-              :class="currentImageIndex === idx
-                ? 'border-warm-400 shadow-sm ring-2 ring-warm-100'
-                : 'border-transparent opacity-75 hover:opacity-100'"
+              :class="
+                currentImageIndex === idx
+                  ? 'border-warm-400 shadow-sm ring-2 ring-warm-100'
+                  : 'border-transparent opacity-75 hover:opacity-100'
+              "
               :aria-label="`查看第${idx + 1}张图片`"
             >
               <img :src="img" class="w-full h-full object-cover" loading="lazy" decoding="async" />
@@ -671,15 +664,24 @@ onUnmounted(() => {
           <div class="um-card p-5 md:p-6">
             <div class="flex items-start justify-between gap-4">
               <div class="space-y-2 min-w-0">
-                <div class="text-3xl md:text-4xl font-black text-warm-600 tracking-tight">¥{{ product.price }}</div>
+                <div class="text-3xl md:text-4xl font-black text-warm-600 tracking-tight">
+                  ¥{{ product.price }}
+                </div>
                 <div class="flex flex-wrap items-center gap-2">
-                  <span class="rounded-full px-3 py-1 text-xs font-semibold bg-slate-50 border border-slate-200 text-slate-600">
+                  <span
+                    class="rounded-full px-3 py-1 text-xs font-semibold bg-slate-50 border border-slate-200 text-slate-600"
+                  >
                     {{ conditionText }}
                   </span>
-                  <span class="rounded-full px-3 py-1 text-xs font-semibold bg-warm-50 border border-warm-100 text-warm-700">
+                  <span
+                    class="rounded-full px-3 py-1 text-xs font-semibold bg-warm-50 border border-warm-100 text-warm-700"
+                  >
                     {{ tradeTypeText }}
                   </span>
-                  <span class="rounded-full px-3 py-1 text-xs font-semibold" :class="tradeStatusStyle">
+                  <span
+                    class="rounded-full px-3 py-1 text-xs font-semibold"
+                    :class="tradeStatusStyle"
+                  >
                     {{ tradeStatusText }}
                   </span>
                 </div>
@@ -690,18 +692,25 @@ onUnmounted(() => {
                 @click="handleLike"
                 :disabled="collectingLoading"
                 class="p-3 rounded-full transition-all active:scale-95 disabled:opacity-60"
-                :class="product.isCollected
-                  ? 'bg-warm-50 text-warm-500 border border-warm-100'
-                  : 'bg-white text-slate-400 hover:bg-warm-50 border border-slate-200'"
-                aria-label="收藏商品"
+                :class="
+                  product.isCollected
+                    ? 'bg-warm-50 text-warm-500 border border-warm-100'
+                    : 'bg-white text-slate-400 hover:bg-warm-50 border border-slate-200'
+                "
+                :aria-label="product.isCollected ? '取消收藏' : '收藏商品'"
+                :aria-pressed="!!product.isCollected"
               >
                 <Heart :size="22" :fill="product.isCollected ? 'currentColor' : 'none'" />
               </button>
             </div>
 
-            <h1 class="mt-4 text-2xl md:text-[1.9rem] leading-tight font-bold text-slate-900">{{ product.title }}</h1>
+            <h1 class="mt-4 text-2xl md:text-[1.9rem] leading-tight font-bold text-slate-900">
+              {{ product.title }}
+            </h1>
 
-            <div class="mt-4 pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-slate-600">
+            <div
+              class="mt-4 pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-slate-600"
+            >
               <div class="inline-flex items-center gap-2 min-w-0">
                 <MapPin :size="15" class="text-slate-400 shrink-0" />
                 <span class="truncate">{{ product.schoolName }} · {{ product.campusName }}</span>
@@ -733,14 +742,22 @@ onUnmounted(() => {
               <div class="min-w-0">
                 <div class="font-bold text-slate-800 flex items-center gap-2">
                   <span class="truncate">{{ isSeller ? '我发布的商品' : product.sellerName }}</span>
-                  <span class="rounded-md border border-emerald-100 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                  <span
+                    v-if="product.sellerAuthStatus === 2"
+                    class="rounded-md border border-emerald-100 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700"
+                  >
                     已认证
                   </span>
                 </div>
-                <div class="text-xs text-slate-400 mt-0.5">{{ isSeller ? '你可以在这里管理商品状态' : '点击可直接发起聊天' }}</div>
+                <div class="text-xs text-slate-400 mt-0.5">
+                  {{ isSeller ? '你可以在这里管理商品状态' : '点击可直接发起聊天' }}
+                </div>
               </div>
             </div>
-            <div v-if="!isSeller" class="rounded-full border border-slate-200 bg-white p-2 text-slate-500">
+            <div
+              v-if="!isSeller"
+              class="rounded-full border border-slate-200 bg-white p-2 text-slate-500"
+            >
               <MessageCircle :size="18" />
             </div>
           </div>
@@ -764,11 +781,21 @@ onUnmounted(() => {
               </div>
               <div class="rounded-xl border border-slate-100 bg-slate-50 p-3">
                 <p class="text-slate-400">运费</p>
-                <p class="mt-1 font-semibold text-slate-700">{{ product.deliveryFee > 0 ? `¥${product.deliveryFee}` : '免邮/协商' }}</p>
+                <p class="mt-1 font-semibold text-slate-700">
+                  {{
+                    product.tradeType === 0
+                      ? '面交免运费'
+                      : product.deliveryFee > 0
+                        ? `¥${product.deliveryFee}`
+                        : '免运费'
+                  }}
+                </p>
               </div>
               <div class="rounded-xl border border-slate-100 bg-slate-50 p-3 sm:col-span-2">
                 <p class="text-slate-400">发布地点</p>
-                <p class="mt-1 font-semibold text-slate-700">{{ product.schoolName }} · {{ product.campusName }}</p>
+                <p class="mt-1 font-semibold text-slate-700">
+                  {{ product.schoolName }} · {{ product.campusName }}
+                </p>
               </div>
             </div>
           </div>
@@ -787,7 +814,9 @@ onUnmounted(() => {
             @click="goToSimilarProduct(item.productId)"
             class="group cursor-pointer"
           >
-            <div class="relative aspect-square rounded-2xl overflow-hidden border border-slate-200 bg-white">
+            <div
+              class="relative aspect-square rounded-2xl overflow-hidden border border-slate-200 bg-white"
+            >
               <img
                 :src="item.image || ''"
                 :alt="item.title"
@@ -799,15 +828,25 @@ onUnmounted(() => {
                 v-if="item.recommendType"
                 class="absolute top-2 left-2 rounded-md bg-slate-900/70 px-2 py-0.5 text-[10px] text-white"
               >
-                {{ item.recommendType === 'content' ? '相似' : item.recommendType === 'cf' ? '猜你喜欢' : '推荐' }}
+                {{
+                  item.recommendType === 'content'
+                    ? '相似'
+                    : item.recommendType === 'cf'
+                      ? '猜你喜欢'
+                      : '推荐'
+                }}
               </div>
             </div>
-            <h4 class="mt-2 text-sm text-slate-700 line-clamp-2 group-hover:text-warm-600 transition-colors">
+            <h4
+              class="mt-2 text-sm text-slate-700 line-clamp-2 group-hover:text-warm-600 transition-colors"
+            >
               {{ item.title }}
             </h4>
             <div class="flex items-baseline gap-2 mt-1">
               <span class="text-warm-600 font-bold">¥{{ item.price }}</span>
-              <span v-if="item.collectCount" class="text-slate-400 text-xs">{{ item.collectCount }}收藏</span>
+              <span v-if="item.collectCount" class="text-slate-400 text-xs"
+                >{{ item.collectCount }}收藏</span
+              >
             </div>
           </article>
         </div>
@@ -815,13 +854,17 @@ onUnmounted(() => {
 
       <section v-else-if="loadingSimilar" class="um-card p-6">
         <div class="flex items-center justify-center py-6">
-          <div class="animate-spin rounded-full h-6 w-6 border-2 border-warm-500 border-t-transparent"></div>
+          <div
+            class="animate-spin rounded-full h-6 w-6 border-2 border-warm-500 border-t-transparent"
+          ></div>
           <span class="ml-2 text-slate-400 text-sm">加载推荐中...</span>
         </div>
       </section>
     </div>
 
-    <div v-else class="max-w-6xl mx-auto px-4 py-20 text-center text-slate-500">商品不存在或已下架</div>
+    <div v-else class="max-w-6xl mx-auto px-4 py-20 text-center text-slate-500">
+      商品不存在或已下架
+    </div>
 
     <div
       v-if="product"
@@ -884,16 +927,20 @@ onUnmounted(() => {
             class="flex-1 bg-white border border-slate-200 text-slate-800 font-bold py-3.5 rounded-2xl transition-colors flex items-center justify-center gap-2"
           >
             <MessageCircle :size="18" />
-            我想要
+            联系卖家
           </button>
 
           <button
-            v-if="!isOrderReadonlyView && product.tradeStatus === TradeStatus.ON_SALE && isReviewPassed(product.reviewStatus)"
+            v-if="
+              !isOrderReadonlyView &&
+              product.tradeStatus === TradeStatus.ON_SALE &&
+              isReviewPassed(product.reviewStatus)
+            "
             @click="handleBuy"
             :disabled="buyingLoading"
-            class="flex-[2] bg-gradient-to-r from-warm-500 to-orange-500 hover:from-warm-600 hover:to-orange-600 text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg shadow-warm-200 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+            class="flex-[2] bg-warm-600 hover:bg-warm-700 text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg shadow-warm-200 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {{ buyingLoading ? '下单中...' : '立即购买' }}
+            {{ buyingLoading ? '下单中...' : '立即下单' }}
           </button>
           <button
             v-else
@@ -906,69 +953,15 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div
-      v-if="showImagePreview && previewImage"
-      class="fixed inset-0 z-[60] bg-black/92 backdrop-blur-sm p-4 md:p-8"
-      @click.self="closeImagePreview"
-    >
-      <button
-        class="absolute top-4 right-4 z-10 inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-black/55 text-white hover:bg-black/70 border border-white/25 transition-colors"
-        @click.stop.prevent="closeImagePreview"
-        aria-label="关闭预览"
-      >
-        <X :size="22" />
-        <span class="text-xs font-medium">关闭</span>
-      </button>
-
-      <div class="h-full w-full flex items-center justify-center">
-        <button
-          v-if="hasMultiImages"
-          class="absolute left-3 md:left-6 p-2 md:p-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
-          @click.stop.prevent="movePreview(-1)"
-          aria-label="上一张图片"
-        >
-          <ChevronLeft :size="22" />
-        </button>
-
-        <img
-          :src="previewImage"
-          :alt="product?.title || '商品图片'"
-          class="max-w-full max-h-full object-contain rounded-2xl"
-          @click.stop.prevent="closeImagePreview"
-        />
-
-        <button
-          v-if="hasMultiImages"
-          class="absolute right-3 md:right-6 p-2 md:p-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
-          @click.stop.prevent="movePreview(1)"
-          aria-label="下一张图片"
-        >
-          <ChevronRight :size="22" />
-        </button>
-      </div>
-
-      <div
-        v-if="hasMultiImages"
-        class="absolute bottom-4 left-1/2 -translate-x-1/2 flex max-w-[90vw] gap-2 overflow-x-auto no-scrollbar"
-      >
-        <button
-          v-for="(img, idx) in productImages"
-          :key="`${img}-preview-${idx}`"
-          @click.stop.prevent="previewImageIndex = idx; currentImageIndex = idx"
-          class="w-14 h-14 rounded-lg overflow-hidden border-2 transition-all"
-          :class="previewImageIndex === idx ? 'border-white' : 'border-transparent opacity-70 hover:opacity-100'"
-        >
-          <img :src="img" class="w-full h-full object-cover" loading="lazy" decoding="async" />
-        </button>
-      </div>
-
-      <button
-        class="absolute bottom-4 right-4 z-10 px-3 py-2 rounded-full bg-black/55 text-white text-xs font-medium border border-white/25 hover:bg-black/70 transition-colors"
-        @click.stop.prevent="closeImagePreview"
-      >
-        关闭预览
-      </button>
-    </div>
+    <ElImageViewer
+      v-if="showImagePreview && productImages.length"
+      :url-list="productImages"
+      :initial-index="previewImageIndex"
+      :z-index="3000"
+      teleported
+      @close="showImagePreview = false"
+      @switch="currentImageIndex = $event"
+    />
   </div>
 </template>
 

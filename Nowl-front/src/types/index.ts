@@ -102,7 +102,6 @@ export interface GoodsInfo {
   isCollected?: boolean
   schoolName?: string
   campusName?: string
-  aiValuation?: number
 }
 
 // 商品VO（用于管理员审核）

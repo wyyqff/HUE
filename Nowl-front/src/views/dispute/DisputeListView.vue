@@ -134,7 +134,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <SubPageShell title="我的纠纷" subtitle="记录、处理进度与结果一览" back-to="/profile" max-width="lg" :use-card="false">
+  <SubPageShell title="交易争议" subtitle="记录、处理进度与结果一览" back-to="/profile" max-width="lg" :use-card="false">
     <template #icon>
       <AlertTriangle class="text-white w-8 h-8" stroke-width="2.5" />
     </template>

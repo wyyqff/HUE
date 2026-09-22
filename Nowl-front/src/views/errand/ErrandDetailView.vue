@@ -105,7 +105,7 @@ const actionHint = computed(() => {
     return `任务待人工复核${task.value.auditReason ? `：${task.value.auditReason}` : ''}`
   }
   if (reviewStatus === ReviewStatus.REJECTED) {
-    return `任务审核未通过${task.value.auditReason ? `：${task.value.auditReason}` : ''}，悬赏金额已退回余额，无需再次取消`
+    return `任务审核未通过${task.value.auditReason ? `：${task.value.auditReason}` : ''}，悬报酬额已退回余额，无需再次取消`
   }
 
   if (task.value.taskStatus === ErrandStatus.PENDING) {
@@ -180,7 +180,7 @@ const ensureRunnerApproved = () => {
     return false
   }
   if (userStore.userInfo?.authStatus !== AuthStatus.APPROVED) {
-    ElMessage.warning('请先完成实名认证')
+    ElMessage.warning('请先完成校园认证')
     router.push('/profile/auth')
     return false
   }
@@ -565,7 +565,7 @@ onUnmounted(() => {
             <p class="text-sm text-slate-500">{{ actionHint }}</p>
           </div>
           <div class="text-right">
-            <div class="text-xs text-slate-400">跑腿赏金</div>
+            <div class="text-xs text-slate-400">跑腿报酬</div>
             <div class="text-3xl font-black text-warm-600 tracking-tight">¥{{ task.reward }}</div>
           </div>
         </div>
@@ -581,7 +581,7 @@ onUnmounted(() => {
           v-if="getReviewStatus(task) === ReviewStatus.REJECTED"
           class="text-xs text-orange-600 mt-2"
         >
-          审核未通过的任务已自动退回悬赏金额，无需再次取消。
+          审核未通过的任务已自动退回悬报酬额，无需再次取消。
         </p>
       </section>
 
@@ -807,7 +807,7 @@ onUnmounted(() => {
         <button
           v-if="canReview"
           @click="goToReview"
-          class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold hover:from-amber-600 hover:to-orange-600 transition-colors flex items-center justify-center gap-2"
+          class="w-full py-3.5 rounded-2xl bg-warm-600 text-white font-bold hover:bg-warm-700 transition-colors flex items-center justify-center gap-2"
         >
           <Star :size="18" />
           去评价

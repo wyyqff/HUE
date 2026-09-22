@@ -330,7 +330,7 @@ onMounted(async () => {
         <button
           @click="handleSave"
           :disabled="saving || !hasChanges"
-          class="w-full rounded-xl bg-gradient-to-r from-warm-500 to-orange-500 text-white font-semibold py-3.5 hover:from-warm-600 hover:to-orange-600 transition-colors disabled:opacity-60"
+          class="w-full rounded-xl bg-warm-600 text-white font-semibold py-3.5 hover:bg-warm-700 transition-colors disabled:opacity-60"
         >
           {{ saving ? '保存中...' : '保存修改' }}
         </button>

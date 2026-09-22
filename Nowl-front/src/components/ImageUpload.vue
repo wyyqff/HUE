@@ -40,6 +40,7 @@ const handleFileChange = async (event: Event) => {
   // 检查数量限制
   if (props.modelValue.length + files.length > props.maxCount) {
     ElMessage.warning(`最多只能上传${props.maxCount}张图片`)
+    target.value = ''
     return
   }
 
@@ -54,8 +55,8 @@ const handleFileChange = async (event: Event) => {
       }
 
       // 检查文件类型
-      if (!file.type.startsWith('image/')) {
-        ElMessage.warning('只能上传图片文件')
+      if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(file.type)) {
+        ElMessage.warning('请选择 JPG、PNG、GIF 或 WebP 图片')
         return null
       }
 
@@ -89,6 +90,11 @@ const removeImage = (index: number) => {
   newImages.splice(index, 1)
   emit('update:modelValue', newImages)
 }
+const setCover = (index: number) => {
+  const image = props.modelValue[index]
+  if (!image || index === 0) return
+  emit('update:modelValue', [image, ...props.modelValue.filter((_, i) => i !== index)])
+}
 </script>
 
 <template>
@@ -113,6 +119,7 @@ const removeImage = (index: number) => {
         >
           封面
         </div>
+        <button v-else type="button" @click="setCover(index)" :aria-label="'将第 ' + (index + 1) + ' 张图片设为封面'" class="absolute bottom-2 left-2 px-2 py-1 bg-white text-warm-700 text-xs font-semibold rounded-lg shadow-sm">设为封面</button>
       </div>
 
       <!-- 上传按钮 -->
@@ -134,7 +141,7 @@ const removeImage = (index: number) => {
     <input
       ref="fileInput"
       type="file"
-      accept="image/*"
+      accept="image/jpeg,image/png,image/gif,image/webp"
       multiple
       class="hidden"
       @change="handleFileChange"

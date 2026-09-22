@@ -8,11 +8,11 @@
   --um-primary-100: #edf2f6;
   --um-accent: #a82634;
   --um-cta: #22c55e;
-  --um-bg: #edf2f6;
+  --um-bg: #f5f7fa;
   --um-bg-soft: #f4f7fa;
   --um-surface: #ffffff;
   --um-surface-2: #f8fafc;
-  --um-border: rgba(37, 75, 104, 0.24);
+  --um-border: rgba(37, 75, 104, 0.13);
   --um-text: #183047;
   --um-muted: #63788b;
   --um-shadow: 0 4px 12px rgba(24, 48, 71, 0.1);
@@ -29,7 +29,7 @@
   --um-header-border: rgba(37, 75, 104, 0.18);
   --um-header-shadow: 0 2px 10px rgba(24, 48, 71, 0.08);
   --um-hover-surface: #edf3f8;
-  --um-focus-ring: rgba(255, 112, 67, 0.26);
+  --um-focus-ring: rgba(37, 75, 104, 0.45);
   --um-duration-fast: 0.2s;
   --um-ease-standard: ease;
 }
@@ -69,7 +69,7 @@ select {
   content: '';
   position: fixed;
   inset: 0;
-  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.4), rgba(239, 235, 233, 0.45));
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.4), rgba(237, 242, 246, 0.3));
   pointer-events: none;
   z-index: -1;
 }
@@ -134,12 +134,12 @@ select {
 .um-btn-primary {
   background: var(--um-accent);
   color: #fff;
-  box-shadow: 0 4px 12px rgba(255, 112, 67, 0.28);
+  box-shadow: 0 4px 12px rgba(168, 38, 52, 0.18);
 }
 
 .um-btn-primary:hover {
-  background: #ff5c2f;
-  box-shadow: 0 6px 14px rgba(255, 112, 67, 0.35);
+  background: #8e1f2b;
+  box-shadow: 0 6px 14px rgba(168, 38, 52, 0.22);
 }
 
 .um-btn-secondary {
@@ -171,14 +171,14 @@ select {
   box-shadow: var(--um-shadow-soft);
 }
 
-.um-theme input:not([type]),
-.um-theme input[type='text'],
+.um-theme input:not([type]):not(.el-input__inner),
+.um-theme input[type='text']:not(.el-input__inner),
 .um-theme input[type='password'],
 .um-theme input[type='number'],
 .um-theme input[type='datetime-local'],
 .um-theme input[type='email'],
 .um-theme input[type='tel'],
-.um-theme textarea,
+.um-theme textarea:not(.el-textarea__inner),
 .um-theme select {
   background: var(--um-surface-2);
   border: 1px solid var(--um-border);
@@ -201,14 +201,14 @@ select {
 
 .um-theme input::placeholder,
 .um-theme textarea::placeholder {
-  color: rgba(141, 123, 117, 0.7);
+  color: rgba(99, 120, 139, 0.8);
 }
 
 .um-theme input:focus,
 .um-theme textarea:focus,
 .um-theme select:focus {
-  border-color: rgba(255, 112, 67, 0.55);
-  box-shadow: 0 0 0 3px rgba(255, 112, 67, 0.14);
+  border-color: rgba(37, 75, 104, 0.6);
+  box-shadow: 0 0 0 3px rgba(37, 75, 104, 0.12);
   background: #fff;
 }
 

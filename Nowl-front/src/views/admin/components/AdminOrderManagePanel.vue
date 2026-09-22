@@ -115,7 +115,7 @@ const formatSchoolCampus = (schoolName?: string, schoolCode?: string, campusName
         <el-option :value="4" label="已取消" />
         <el-option :value="5" label="已结束" />
       </el-select>
-      <button @click="emit('search')" class="px-6 py-2.5 bg-gradient-to-r from-warm-500 to-orange-500 text-white rounded-xl text-sm font-bold hover:shadow-lg hover:shadow-warm-200 transition-all">
+      <button @click="emit('search')" class="px-6 py-2.5 bg-warm-600 text-white rounded-xl text-sm font-bold hover:shadow-lg hover:shadow-warm-200 transition-all">
         筛选
       </button>
     </div>

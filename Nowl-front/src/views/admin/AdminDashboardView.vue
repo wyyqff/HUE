@@ -940,7 +940,7 @@ const {
               <button
                 @click="submitDisputeHandle"
                 :disabled="disputeHandleSubmitting"
-                class="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl text-sm font-bold hover:shadow-lg hover:shadow-amber-200 transition-all disabled:opacity-60"
+                class="px-5 py-2.5 bg-warm-600 text-white rounded-xl text-sm font-bold hover:shadow-lg hover:shadow-amber-200 transition-all disabled:opacity-60"
               >
                 {{ disputeHandleSubmitting ? '提交中...' : '确认提交' }}
               </button>
@@ -983,7 +983,7 @@ const {
               <button @click="showBroadcastDialog = false" class="px-5 py-2.5 bg-warm-50 border border-warm-200 text-warm-700 rounded-xl text-sm font-bold hover:bg-warm-100 transition-all">
                 取消
               </button>
-              <button @click="handleBroadcastNotice" class="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl text-sm font-bold hover:shadow-lg hover:shadow-amber-200 transition-all">
+              <button @click="handleBroadcastNotice" class="px-5 py-2.5 bg-warm-600 text-white rounded-xl text-sm font-bold hover:shadow-lg hover:shadow-amber-200 transition-all">
                 发送广播
               </button>
             </div>

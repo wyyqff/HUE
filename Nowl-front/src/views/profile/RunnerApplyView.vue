@@ -348,7 +348,7 @@ onMounted(async () => {
         <button
           @click="handleSubmit"
           :disabled="loading || !canSubmit"
-          class="w-full rounded-xl bg-gradient-to-r from-warm-500 to-orange-500 text-white font-semibold py-3.5 hover:from-warm-600 hover:to-orange-600 transition-colors disabled:opacity-60 inline-flex items-center justify-center gap-1.5"
+          class="w-full rounded-xl bg-warm-600 text-white font-semibold py-3.5 hover:bg-warm-700 transition-colors disabled:opacity-60 inline-flex items-center justify-center gap-1.5"
         >
           <span>{{ loading ? '提交中...' : '确认提交申请' }}</span>
           <ArrowRight v-if="!loading" :size="16" />

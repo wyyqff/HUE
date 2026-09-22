@@ -390,7 +390,7 @@ export const useAdminDashboard = () => {
     { id: 'errand-manage', label: '跑腿审核', icon: Bike, badge: null },
     { id: 'dispute-manage', label: '纠纷管理', icon: AlertTriangle, badge: 'pendingDisputes' },
     { id: 'risk-center', label: '风控中心', icon: ShieldCheck, badge: null },
-    { id: 'iam-center', label: 'IAM权限', icon: Users, badge: null },
+    { id: 'iam-center', label: '角色权限', icon: Users, badge: null },
     { id: 'audit-center', label: '审计中心', icon: ClipboardList, badge: null },
     { id: 'search-manage', label: '搜索管理', icon: Search, badge: null },
   ]

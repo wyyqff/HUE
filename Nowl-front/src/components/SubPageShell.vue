@@ -88,7 +88,7 @@ const handleBack = () => {
   height: 320px;
   top: -160px;
   left: -120px;
-  background: radial-gradient(circle at center, rgba(255, 143, 0, 0.22), rgba(255, 143, 0, 0));
+  background: radial-gradient(circle at center, rgba(37, 75, 104, 0.10), rgba(37, 75, 104, 0));
 }
 
 .sub-shell::after {
@@ -96,7 +96,7 @@ const handleBack = () => {
   height: 360px;
   right: -140px;
   top: -180px;
-  background: radial-gradient(circle at center, rgba(141, 110, 99, 0.2), rgba(141, 110, 99, 0));
+  background: radial-gradient(circle at center, rgba(168, 38, 52, 0.08), rgba(168, 38, 52, 0));
 }
 
 .sub-container {
@@ -125,8 +125,8 @@ const handleBack = () => {
 
 .sub-back:hover {
   color: var(--um-accent);
-  border-color: rgba(255, 112, 67, 0.35);
-  background: #fff7f3;
+  border-color: rgba(37, 75, 104, 0.3);
+  background: #edf2f6;
 }
 
 .sub-header {
@@ -148,7 +148,7 @@ const handleBack = () => {
   align-items: center;
   justify-content: center;
   margin-bottom: 12px;
-  box-shadow: 0 4px 10px rgba(255, 112, 67, 0.3);
+  box-shadow: 0 4px 10px rgba(168, 38, 52, 0.16);
   animation: float-in 0.45s ease;
 }
 
