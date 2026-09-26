@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 
+test.use({ channel: process.env.E2E_BROWSER_CHANNEL })
+
 test.setTimeout(60_000)
 
 const apiOk = <T>(data: T) => ({
@@ -310,7 +312,7 @@ test('待支付订单不显示查看纠纷按钮', async ({ page }) => {
 
   await page.goto('/profile/my-orders?type=buy')
 
-  await expect(page.getByRole('button', { name: '立即支付' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '余额付款' })).toBeVisible()
   await expect(page.getByRole('button', { name: '取消订单' })).toBeVisible()
   await expect(page.getByRole('button', { name: '查看纠纷' })).toHaveCount(0)
 })
@@ -320,7 +322,7 @@ test('订单双击支付只提交一次请求', async ({ page }) => {
   let payRequestCount = 0
   await mockApi(page, (url) => {
     if (url.includes('/api/user/info')) {
-      return buildUserInfo(10)
+      return { ...buildUserInfo(10), money: 100 }
     }
     if (url.includes('/api/notice/unread/count')) {
       return 0
@@ -362,7 +364,7 @@ test('订单双击支付只提交一次请求', async ({ page }) => {
 
   await page.goto('/profile/my-orders?type=buy')
 
-  const payButton = page.getByRole('button', { name: '立即支付' })
+  const payButton = page.getByRole('button', { name: '余额付款' })
   await expect(payButton).toBeVisible()
   await payButton.evaluate((element) => {
     const button = element as HTMLButtonElement
@@ -370,7 +372,7 @@ test('订单双击支付只提交一次请求', async ({ page }) => {
     button.click()
   })
 
-  const confirmButton = page.getByRole('button', { name: '确认' }).last()
+  const confirmButton = page.getByRole('button', { name: '确认付款' }).last()
   await expect(confirmButton).toBeVisible()
   await confirmButton.click()
 
@@ -509,7 +511,7 @@ test('订单缺少有效纠纷ID时不显示查看纠纷入口', async ({ page }
 
   await page.goto('/profile/my-orders?type=buy')
 
-  await expect(page.getByRole('button', { name: '立即支付' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '余额付款' })).toBeVisible()
   await expect(page.getByRole('button', { name: '查看纠纷' })).toHaveCount(0)
   await expect(page.getByText('纠纷处理中')).toHaveCount(0)
 })
@@ -754,6 +756,6 @@ test('跑腿纠纷创建页对非参与者禁用提交', async ({ page }) => {
 
   await page.goto('/dispute/create?type=1&id=103')
 
-  await expect(page.getByText('当前跑腿暂不满足纠纷条件（需为任务参与方，且任务已被接单）。')).toBeVisible()
+  await expect(page.getByText(/当前跑腿暂不满足纠纷条件（仅发布者可发起/)).toBeVisible()
   await expect(page.getByRole('button', { name: '提交纠纷' })).toBeDisabled()
 })

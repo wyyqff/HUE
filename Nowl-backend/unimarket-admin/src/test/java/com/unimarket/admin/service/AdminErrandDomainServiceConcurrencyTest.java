@@ -5,6 +5,7 @@ import com.unimarket.admin.service.impl.support.AdminActionLockSupport;
 import com.unimarket.admin.service.impl.support.AdminScopeSupport;
 import com.unimarket.admin.service.impl.support.AdminSchoolInfoSupport;
 import com.unimarket.common.enums.ReviewStatus;
+import com.unimarket.common.enums.ErrandStatus;
 import com.unimarket.common.exception.BusinessException;
 import com.unimarket.module.errand.entity.ErrandTask;
 import com.unimarket.module.errand.mapper.ErrandTaskMapper;
@@ -24,6 +25,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -73,7 +75,7 @@ class AdminErrandDomainServiceConcurrencyTest {
         task.setSchoolCode("SC001");
         task.setCampusCode("CP001");
         task.setReviewStatus(ReviewStatus.MANUAL_PASSED.getCode());
-        when(errandTaskMapper.selectById(100L)).thenReturn(task);
+        when(errandTaskMapper.selectByIdForUpdate(100L)).thenReturn(task);
 
         errandDomainService.auditErrand(1L, 100L, 1, null);
 
@@ -90,7 +92,7 @@ class AdminErrandDomainServiceConcurrencyTest {
         task.setSchoolCode("SC001");
         task.setCampusCode("CP001");
         task.setReviewStatus(ReviewStatus.REJECTED.getCode());
-        when(errandTaskMapper.selectById(100L)).thenReturn(task);
+        when(errandTaskMapper.selectByIdForUpdate(100L)).thenReturn(task);
 
         assertThrows(BusinessException.class, () -> errandDomainService.auditErrand(1L, 100L, 1, "改判"));
         verify(errandTaskMapper, never()).updateById(any(ErrandTask.class));
@@ -108,20 +110,33 @@ class AdminErrandDomainServiceConcurrencyTest {
         task.setReward(new BigDecimal("18.00"));
         task.setReviewStatus(ReviewStatus.WAIT_MANUAL.getCode());
 
-        UserInfo publisher = new UserInfo();
-        publisher.setUserId(200L);
-        publisher.setMoney(new BigDecimal("20.00"));
+        when(errandTaskMapper.selectByIdForUpdate(100L)).thenReturn(task);
+        org.mockito.Mockito.lenient().when(userInfoMapper.creditBalance(200L, new BigDecimal("18.00"))).thenReturn(1);
 
-        when(errandTaskMapper.selectById(100L)).thenReturn(task);
-        when(userInfoMapper.selectById(200L)).thenReturn(publisher);
-        when(userInfoMapper.updateById(publisher)).thenReturn(1);
+        assertDoesNotThrow(() -> errandDomainService.auditErrand(1L, 100L, 2, "违规内容"));
 
-        errandDomainService.auditErrand(1L, 100L, 2, "违规内容");
-
-        assertEquals(new BigDecimal("38.00"), publisher.getMoney());
+        verify(userInfoMapper).creditBalance(200L, new BigDecimal("18.00"));
+        verify(userInfoMapper, never()).updateById(any(UserInfo.class));
         verify(errandTaskMapper).updateById(task);
         verify(noticeService).sendNotice(200L, "跑腿任务审核未通过", "您的跑腿任务【帮取外卖】未通过人工复核，悬赏金额已退回余额。原因：违规内容", 1, 100L);
         verify(rocketMQTemplate).convertAndSend("errand-sync-topic", com.unimarket.common.mq.ErrandSyncMessage.deleteMessage(100L));
+    }
+
+    @Test
+    void auditErrand_cancelledTaskCannotRefundEscrowAgain() {
+        ErrandTask task = new ErrandTask();
+        task.setTaskId(101L);
+        task.setPublisherId(201L);
+        task.setReward(new BigDecimal("18.00"));
+        task.setReviewStatus(ReviewStatus.WAIT_MANUAL.getCode());
+        task.setTaskStatus(ErrandStatus.CANCELLED.getCode());
+        when(errandTaskMapper.selectByIdForUpdate(101L)).thenReturn(task);
+        org.mockito.Mockito.lenient().when(userInfoMapper.creditBalance(201L, new BigDecimal("18.00"))).thenReturn(1);
+
+        assertThrows(BusinessException.class, () -> errandDomainService.auditErrand(1L, 101L, 2, "违规内容"));
+
+        verify(userInfoMapper, never()).creditBalance(any(), any());
+        verify(errandTaskMapper, never()).updateById(any(ErrandTask.class));
     }
 }
 

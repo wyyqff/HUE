@@ -7,7 +7,7 @@ import { ORDER_API } from '@/config/apiPaths'
  */
 
 // 创建订单
-export const createOrder = (data: { productId: number; remark?: string }) => {
+export const createOrder = (data: { productId: number; tradeType?: 0 | 1; remark?: string }) => {
   return request.post<void>(ORDER_API.CREATE, data)
 }
 

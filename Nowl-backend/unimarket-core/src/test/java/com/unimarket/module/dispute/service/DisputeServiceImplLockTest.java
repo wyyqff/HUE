@@ -88,4 +88,32 @@ class DisputeServiceImplLockTest {
         assertTrue(ex.getMessage().contains("系统繁忙"));
         verify(disputeRecordMapper, never()).updateById(any(DisputeRecord.class));
     }
+
+    @Test
+    void withdrawCannotOverwriteCommittedResolution() {
+        DisputeRecord finished = new DisputeRecord();
+        finished.setRecordId(200L);
+        finished.setInitiatorId(100L);
+        finished.setHandleStatus(2);
+        when(disputeRecordMapper.selectByIdForUpdate(200L)).thenReturn(finished);
+        assertThrows(BusinessException.class, () -> disputeService.withdrawDispute(100L, 200L));
+        verify(disputeRecordMapper, never()).updateById(any(DisputeRecord.class));
+    }
+
+    @Test
+    void evidenceCannotReopenCommittedResolution() throws Exception {
+        when(redissonClient.getLock(anyString())).thenReturn(lock);
+        when(lock.tryLock(anyLong(), anyLong(), any(TimeUnit.class))).thenReturn(true);
+        DisputeRecord finished = new DisputeRecord();
+        finished.setRecordId(200L);
+        finished.setInitiatorId(100L);
+        finished.setRelatedId(101L);
+        finished.setHandleStatus(2);
+        when(disputeRecordMapper.selectByIdForUpdate(200L)).thenReturn(finished);
+        DisputeReplyDTO dto = new DisputeReplyDTO();
+        dto.setRecordId(200L);
+        dto.setAdditionalContent("延迟到达的补充说明");
+        assertThrows(BusinessException.class, () -> disputeService.addEvidence(100L, dto));
+        verify(disputeRecordMapper, never()).updateById(any(DisputeRecord.class));
+    }
 }

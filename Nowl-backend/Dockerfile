@@ -11,9 +11,10 @@ COPY unimarket-admin/pom.xml unimarket-admin/
 COPY unimarket-search/pom.xml unimarket-search/
 COPY unimarket-recommend/pom.xml unimarket-recommend/
 COPY unimarket-web/pom.xml unimarket-web/
+COPY unimarket-gateway/pom.xml unimarket-gateway/
 
 # 下载依赖
-RUN mvn dependency:go-offline -B
+RUN mvn dependency:go-offline -B -pl unimarket-web -am
 
 # 复制源代码并构建
 COPY . .

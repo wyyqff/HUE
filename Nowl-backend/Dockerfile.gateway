@@ -3,6 +3,13 @@ FROM maven:3.9-eclipse-temurin-17 AS builder
 WORKDIR /app
 
 COPY pom.xml .
+COPY unimarket-security/pom.xml unimarket-security/
+COPY unimarket-ai/pom.xml unimarket-ai/
+COPY unimarket-core/pom.xml unimarket-core/
+COPY unimarket-admin/pom.xml unimarket-admin/
+COPY unimarket-search/pom.xml unimarket-search/
+COPY unimarket-recommend/pom.xml unimarket-recommend/
+COPY unimarket-web/pom.xml unimarket-web/
 COPY unimarket-gateway/pom.xml unimarket-gateway/
 
 RUN mvn dependency:go-offline -B -pl unimarket-gateway

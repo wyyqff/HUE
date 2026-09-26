@@ -1,6 +1,7 @@
 package com.unimarket.module.order.dto;
 
 import jakarta.validation.constraints.NotNull;
+import org.hibernate.validator.constraints.Range;
 import lombok.Data;
 import org.hibernate.validator.constraints.Length;
 
@@ -15,6 +16,10 @@ public class OrderCreateDTO {
      */
     @NotNull(message = "商品ID不能为空")
     private Long productId;
+
+    /** 实际交付方式：0-面交，1-邮寄；皆可商品必须明确选择。 */
+    @Range(min = 0, max = 1, message = "请选择面交或邮寄")
+    private Integer tradeType;
 
     /**
      * 订单备注

@@ -133,6 +133,7 @@ CREATE TABLE IF NOT EXISTS `order_info` (
   `campus_code` VARCHAR(16) NOT NULL COMMENT '订单所属校区(冗余)',
   `order_amount` DECIMAL(10,2) NOT NULL,
   `delivery_fee` DECIMAL(8,2) NOT NULL DEFAULT 0.00,
+  `trade_type` TINYINT DEFAULT NULL COMMENT '下单交付方式快照：0面交，1邮寄；历史订单可为空',
   `total_amount` DECIMAL(10,2) NOT NULL,
   `order_status` TINYINT NOT NULL DEFAULT 0 COMMENT '0待支付,1待发货,2待收货,3完成,4取消',
   `pay_time` DATETIME DEFAULT NULL,

@@ -7,13 +7,14 @@ import com.unimarket.common.enums.DisputeTargetType;
 import com.unimarket.common.enums.NoticeType;
 import com.unimarket.common.enums.OrderStatus;
 import com.unimarket.common.enums.RefundStatus;
+import com.unimarket.common.exception.BusinessException;
+import com.unimarket.common.utils.MoneyValidator;
 import com.unimarket.module.dispute.entity.DisputeRecord;
 import com.unimarket.module.dispute.mapper.DisputeRecordMapper;
 import com.unimarket.module.notice.service.NoticeService;
 import com.unimarket.module.order.dto.OrderAutoConfirmMessage;
 import com.unimarket.module.order.entity.OrderInfo;
 import com.unimarket.module.order.mapper.OrderInfoMapper;
-import com.unimarket.module.user.entity.UserInfo;
 import com.unimarket.module.user.mapper.UserInfoMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -63,7 +64,7 @@ public class OrderAutoConfirmListener implements RocketMQListener<OrderAutoConfi
             }
 
             // 1. 查询订单
-            OrderInfo order = orderInfoMapper.selectById(orderId);
+            OrderInfo order = orderInfoMapper.selectByIdForUpdate(orderId);
             if (order == null) {
                 log.warn("订单不存在，跳过自动确认: orderId={}", orderId);
                 return;
@@ -93,12 +94,11 @@ public class OrderAutoConfirmListener implements RocketMQListener<OrderAutoConfi
             }
 
             // 4. 资金结算：转入卖家账户
-            UserInfo seller = userInfoMapper.selectById(order.getSellerId());
-            if (seller != null) {
-                seller.setMoney(seller.getMoney().add(order.getTotalAmount()));
-                userInfoMapper.updateById(seller);
-                log.info("资金已转入卖家账户: sellerId={}, amount={}", seller.getUserId(), order.getTotalAmount());
+            MoneyValidator.requireValid(order.getTotalAmount(), false, "订单总额");
+            if (userInfoMapper.creditBalance(order.getSellerId(), order.getTotalAmount()) != 1) {
+                throw new BusinessException("卖家账户不存在，无法结算");
             }
+            log.info("资金已转入卖家账户: sellerId={}, amount={}", order.getSellerId(), order.getTotalAmount());
 
             // 5. 更新订单状态
             order.setOrderStatus(OrderStatus.COMPLETED.getCode()); // 已完成

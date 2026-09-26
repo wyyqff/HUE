@@ -3,6 +3,7 @@ package com.unimarket.utils;
 import cn.hutool.http.HttpUtil;
 import cn.hutool.json.JSONUtil;
 import com.unimarket.common.config.SmsProperties;
+import com.unimarket.common.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -30,9 +31,9 @@ public class SmsUtils {
     public boolean sendSmsCode(String phone, String code) {
         log.info("【短信发送】手机号: {}", maskPhone(phone));
 
-        if (!smsProperties.isEnabled()) {
-            log.info("【短信发送】短信服务已禁用，跳过发送");
-            return true;
+        if (!smsProperties.isEnabled() || smsProperties.getUrl() == null || smsProperties.getUrl().isBlank()) {
+            log.warn("【短信发送】短信服务未启用或未配置发送地址");
+            throw new BusinessException(503, "短信服务尚未配置，请联系管理员");
         }
 
         try {

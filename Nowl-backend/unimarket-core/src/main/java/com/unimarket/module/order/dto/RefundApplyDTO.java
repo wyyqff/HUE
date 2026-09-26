@@ -1,6 +1,7 @@
 package com.unimarket.module.order.dto;
 
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -26,6 +27,7 @@ public class RefundApplyDTO {
      */
     @NotNull(message = "退款金额不能为空")
     @DecimalMin(value = "0.01", message = "退款金额必须大于0")
+    @Digits(integer = 8, fraction = 2, message = "退款金额最多8位整数和2位小数")
     private BigDecimal amount;
 }
 

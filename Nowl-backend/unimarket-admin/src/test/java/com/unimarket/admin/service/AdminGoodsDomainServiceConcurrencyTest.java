@@ -71,7 +71,7 @@ class AdminGoodsDomainServiceConcurrencyTest {
         goods.setCampusCode("CP001");
         goods.setTradeStatus(TradeStatus.ON_SALE.getCode());
         goods.setReviewStatus(ReviewStatus.MANUAL_PASSED.getCode());
-        when(goodsInfoMapper.selectById(100L)).thenReturn(goods);
+        when(goodsInfoMapper.selectByIdForUpdate(100L)).thenReturn(goods);
 
         goodsDomainService.auditGoods(1L, 100L, 1, null);
 
@@ -89,7 +89,7 @@ class AdminGoodsDomainServiceConcurrencyTest {
         goods.setCampusCode("CP001");
         goods.setTradeStatus(TradeStatus.ON_SALE.getCode());
         goods.setReviewStatus(ReviewStatus.REJECTED.getCode());
-        when(goodsInfoMapper.selectById(100L)).thenReturn(goods);
+        when(goodsInfoMapper.selectByIdForUpdate(100L)).thenReturn(goods);
 
         assertThrows(BusinessException.class, () -> goodsDomainService.auditGoods(1L, 100L, 1, "改判"));
         verify(goodsInfoMapper, never()).updateById(any(GoodsInfo.class));

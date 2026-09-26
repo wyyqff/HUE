@@ -14,8 +14,10 @@ import com.unimarket.common.enums.ErrandStatus;
 import com.unimarket.common.enums.NoticeType;
 import com.unimarket.common.enums.OrderStatus;
 import com.unimarket.common.enums.RefundStatus;
+import com.unimarket.common.enums.ReviewStatus;
 import com.unimarket.common.enums.TradeStatus;
 import com.unimarket.common.exception.BusinessException;
+import com.unimarket.common.utils.MoneyValidator;
 import com.unimarket.common.config.RocketMQConfig;
 import com.unimarket.common.mq.GoodsSyncMessage;
 import com.unimarket.module.errand.entity.ErrandTask;
@@ -90,7 +92,7 @@ public class AdminDisputeDomainService {
                                  Integer handleStatus,
                                  Integer deductCreditScore,
                                  BigDecimal refundAmount) {
-        DisputeRecord record = disputeRecordMapper.selectById(disputeId);
+        DisputeRecord record = disputeRecordMapper.selectByIdForUpdate(disputeId);
         if (record == null) {
             throw new BusinessException("纠纷记录不存在");
         }
@@ -121,6 +123,10 @@ public class AdminDisputeDomainService {
         }
 
         boolean resolved = normalizedHandleStatus == resolvedStatus;
+
+        if (refundAmount != null) {
+            MoneyValidator.requireValid(refundAmount, true, "裁定退款金额");
+        }
 
         int actualCreditPenalty = normalizeCreditPenalty(record, resolved, deductCreditScore);
         if (actualCreditPenalty > 0) {
@@ -211,18 +217,21 @@ public class AdminDisputeDomainService {
                                                DisputeRecord record,
                                                boolean resolved,
                                                BigDecimal refundAmount) {
-        OrderInfo order = orderInfoMapper.selectById(record.getContentId());
+        OrderInfo order = orderInfoMapper.selectByIdForUpdate(record.getContentId());
         if (order == null) {
             return BigDecimal.ZERO;
         }
 
-        if (!OrderStatus.PENDING_RECEIVE.getCode().equals(order.getOrderStatus())) {
-            // 历史数据可能存在已完成/已取消订单发起纠纷的情况；为避免重复结算，这里仅对待收货订单执行资金结算。
-            log.info("订单状态非待收货，跳过纠纷结算: disputeId={}, orderId={}, status={}",
+        if (!OrderStatus.PENDING_RECEIVE.getCode().equals(order.getOrderStatus())
+                && !OrderStatus.PENDING_DELIVERY.getCode().equals(order.getOrderStatus())) {
+            // 仅结算仍在托管中的已支付订单，终态订单不得重复结算。
+            log.info("订单状态不可结算，跳过纠纷结算: disputeId={}, orderId={}, status={}",
                     record.getRecordId(), order.getOrderId(), order.getOrderStatus());
             return BigDecimal.ZERO;
         }
 
+        MoneyValidator.requireValid(order.getTotalAmount(), false, "订单托管金额");
+        boolean beforeDelivery = OrderStatus.PENDING_DELIVERY.getCode().equals(order.getOrderStatus());
         BigDecimal actualRefund = BigDecimal.ZERO;
         if (resolved
                 && record.getClaimRefund() != null
@@ -239,12 +248,20 @@ public class AdminDisputeDomainService {
             actualRefund = refundAmount;
         }
 
+        if (beforeDelivery) {
+            if (actualRefund.signum() == 0) {
+                // 驳回申诉不等于确认交付，保留原订单及托管资金供后续履约。
+                return BigDecimal.ZERO;
+            }
+            if (actualRefund.compareTo(order.getTotalAmount()) != 0) {
+                throw new BusinessException("待交付订单仅支持全额退款裁定");
+            }
+        }
+
         // 退款：返还买家
         if (actualRefund.compareTo(BigDecimal.ZERO) > 0) {
-            UserInfo buyer = userInfoMapper.selectById(order.getBuyerId());
-            if (buyer != null) {
-                buyer.setMoney(buyer.getMoney().add(actualRefund));
-                userInfoMapper.updateById(buyer);
+            if (userInfoMapper.creditBalance(order.getBuyerId(), actualRefund) != 1) {
+                throw new BusinessException("买家账户不存在或纠纷退款失败");
             }
             order.setRefundStatus(RefundStatus.APPROVED.getCode());
             order.setRefundAmount(actualRefund);
@@ -258,10 +275,8 @@ public class AdminDisputeDomainService {
         // 结算：剩余金额转入卖家
         BigDecimal sellerIncome = order.getTotalAmount().subtract(actualRefund);
         if (sellerIncome.compareTo(BigDecimal.ZERO) > 0) {
-            UserInfo seller = userInfoMapper.selectById(order.getSellerId());
-            if (seller != null) {
-                seller.setMoney(seller.getMoney().add(sellerIncome));
-                userInfoMapper.updateById(seller);
+            if (userInfoMapper.creditBalance(order.getSellerId(), sellerIncome) != 1) {
+                throw new BusinessException("卖家账户不存在或纠纷结算失败");
             }
         }
 
@@ -271,9 +286,13 @@ public class AdminDisputeDomainService {
 
         // 全额退款：商品重新上架（资金全额退回，视为交易关闭）
         if (resolved && actualRefund.compareTo(order.getTotalAmount()) == 0) {
-            GoodsInfo goods = goodsInfoMapper.selectById(order.getProductId());
+            GoodsInfo goods = goodsInfoMapper.selectByIdForUpdate(order.getProductId());
             if (goods != null) {
-                goods.setTradeStatus(TradeStatus.ON_SALE.getCode());
+                boolean approvedGoods = ReviewStatus.AI_PASSED.getCode().equals(goods.getReviewStatus())
+                        || ReviewStatus.MANUAL_PASSED.getCode().equals(goods.getReviewStatus());
+                boolean canRelist = beforeDelivery && approvedGoods
+                        && TradeStatus.SOLD.getCode().equals(goods.getTradeStatus());
+                goods.setTradeStatus(canRelist ? TradeStatus.ON_SALE.getCode() : TradeStatus.OFF_SHELF.getCode());
                 goodsInfoMapper.updateById(goods);
                 sendGoodsSyncAfterCommit(GoodsSyncMessage.updateMessage(order.getProductId()));
             }
@@ -288,7 +307,7 @@ public class AdminDisputeDomainService {
                                                 DisputeRecord record,
                                                 boolean resolved,
                                                 BigDecimal refundAmount) {
-        ErrandTask task = errandTaskMapper.selectById(record.getContentId());
+        ErrandTask task = errandTaskMapper.selectByIdForUpdate(record.getContentId());
         if (task == null) {
             return BigDecimal.ZERO;
         }
@@ -300,6 +319,7 @@ public class AdminDisputeDomainService {
             return BigDecimal.ZERO;
         }
 
+        MoneyValidator.requireValid(task.getReward(), false, "跑腿托管金额");
         BigDecimal actualRefund = BigDecimal.ZERO;
         if (resolved
                 && record.getClaimRefund() != null
@@ -317,19 +337,16 @@ public class AdminDisputeDomainService {
         }
 
         if (actualRefund.compareTo(BigDecimal.ZERO) > 0) {
-            UserInfo publisher = userInfoMapper.selectById(task.getPublisherId());
-            if (publisher != null) {
-                publisher.setMoney(publisher.getMoney().add(actualRefund));
-                userInfoMapper.updateById(publisher);
+            if (userInfoMapper.creditBalance(task.getPublisherId(), actualRefund) != 1) {
+                throw new BusinessException("发布者账户不存在或纠纷退款失败");
             }
         }
 
         BigDecimal acceptorIncome = task.getReward().subtract(actualRefund);
-        if (acceptorIncome.compareTo(BigDecimal.ZERO) > 0 && task.getAcceptorId() != null) {
-            UserInfo acceptor = userInfoMapper.selectById(task.getAcceptorId());
-            if (acceptor != null) {
-                acceptor.setMoney(acceptor.getMoney().add(acceptorIncome));
-                userInfoMapper.updateById(acceptor);
+        if (acceptorIncome.compareTo(BigDecimal.ZERO) > 0) {
+            if (task.getAcceptorId() == null
+                    || userInfoMapper.creditBalance(task.getAcceptorId(), acceptorIncome) != 1) {
+                throw new BusinessException("接单人账户不存在或纠纷结算失败");
             }
         }
 

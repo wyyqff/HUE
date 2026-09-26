@@ -10,6 +10,7 @@ import com.unimarket.module.order.mapper.OrderInfoMapper;
 import com.unimarket.module.order.service.impl.OrderServiceImpl;
 import com.unimarket.module.user.entity.UserInfo;
 import com.unimarket.module.user.mapper.UserInfoMapper;
+import com.unimarket.module.dispute.mapper.DisputeRecordMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -46,6 +47,8 @@ class OrderServiceTest {
     @Mock
     private OrderDelayMessageService orderDelayMessageService;
     @Mock
+    private DisputeRecordMapper disputeRecordMapper;
+    @Mock
     private RLock lock;
 
     @InjectMocks
@@ -64,6 +67,7 @@ class OrderServiceTest {
         buyer.setNickName("买家A");
         buyer.setAuthStatus(2); // 已认证
         buyer.setMoney(new BigDecimal("1000.00"));
+        buyer.setSchoolCode("HUE");
 
         // 初始化卖家
         seller = new UserInfo();
@@ -79,6 +83,9 @@ class OrderServiceTest {
         goods.setPrice(new BigDecimal("99.00"));
         goods.setDeliveryFee(new BigDecimal("5.00"));
         goods.setTradeStatus(0); // 在售
+        goods.setReviewStatus(1);
+        goods.setSchoolCode("HUE");
+        goods.setTradeType(1);
 
         // 初始化订单
         order = new OrderInfo();
@@ -101,7 +108,7 @@ class OrderServiceTest {
         when(lock.tryLock(anyLong(), anyLong(), any(TimeUnit.class))).thenReturn(true);
         when(lock.isHeldByCurrentThread()).thenReturn(true);
         when(userInfoMapper.selectById(1L)).thenReturn(buyer);
-        when(goodsInfoMapper.selectById(100L)).thenReturn(goods);
+        when(goodsInfoMapper.selectByIdForUpdate(100L)).thenReturn(goods);
         when(orderInfoMapper.insert(any(OrderInfo.class))).thenReturn(1);
 
         OrderCreateDTO dto = new OrderCreateDTO();
@@ -123,7 +130,7 @@ class OrderServiceTest {
         when(lock.tryLock(anyLong(), anyLong(), any(TimeUnit.class))).thenReturn(true);
         when(lock.isHeldByCurrentThread()).thenReturn(true);
         when(userInfoMapper.selectById(1L)).thenReturn(buyer);
-        when(goodsInfoMapper.selectById(100L)).thenReturn(goods);
+        when(goodsInfoMapper.selectByIdForUpdate(100L)).thenReturn(goods);
         when(orderInfoMapper.insert(any(OrderInfo.class))).thenReturn(1);
 
         OrderCreateDTO dto = new OrderCreateDTO();
@@ -141,17 +148,18 @@ class OrderServiceTest {
         when(redissonClient.getLock(anyString())).thenReturn(lock);
         when(lock.tryLock(anyLong(), anyLong(), any(TimeUnit.class))).thenReturn(true);
         when(lock.isHeldByCurrentThread()).thenReturn(true);
-        when(orderInfoMapper.selectById(1000L)).thenReturn(order);
-        when(userInfoMapper.selectById(1L)).thenReturn(buyer);
-        when(goodsInfoMapper.selectById(100L)).thenReturn(goods);
+        when(orderInfoMapper.selectByIdForUpdate(1000L)).thenReturn(order);
+        when(userInfoMapper.debitBalance(1L, new BigDecimal("104.00"))).thenReturn(1);
+        when(goodsInfoMapper.selectByIdForUpdate(100L)).thenReturn(goods);
+        when(goodsInfoMapper.markSoldIfAvailable(100L)).thenReturn(1);
 
         // Act
         assertDoesNotThrow(() -> orderService.pay(1000L));
 
         // Assert
-        verify(userInfoMapper).updateById(buyer);
+        verify(userInfoMapper).debitBalance(1L, new BigDecimal("104.00"));
         verify(orderInfoMapper).updateById(order);
-        assertEquals(new BigDecimal("896.00"), buyer.getMoney()); // 1000 - 104
+        verify(userInfoMapper, never()).updateById(any(UserInfo.class));
         assertEquals(1, order.getOrderStatus()); // 待发货
     }
 
@@ -163,8 +171,8 @@ class OrderServiceTest {
         when(redissonClient.getLock(anyString())).thenReturn(lock);
         when(lock.tryLock(anyLong(), anyLong(), any(TimeUnit.class))).thenReturn(true);
         when(lock.isHeldByCurrentThread()).thenReturn(true);
-        when(orderInfoMapper.selectById(1000L)).thenReturn(order);
-        when(userInfoMapper.selectById(1L)).thenReturn(buyer);
+        when(orderInfoMapper.selectByIdForUpdate(1000L)).thenReturn(order);
+        when(goodsInfoMapper.selectByIdForUpdate(100L)).thenReturn(goods);
 
         // Act & Assert
         BusinessException ex = assertThrows(BusinessException.class, () -> orderService.pay(1000L));
@@ -179,7 +187,7 @@ class OrderServiceTest {
         when(redissonClient.getLock(anyString())).thenReturn(lock);
         when(lock.tryLock(anyLong(), anyLong(), any(TimeUnit.class))).thenReturn(true);
         when(lock.isHeldByCurrentThread()).thenReturn(true);
-        when(orderInfoMapper.selectById(1000L)).thenReturn(order);
+        when(orderInfoMapper.selectByIdForUpdate(1000L)).thenReturn(order);
 
         // Act & Assert
         BusinessException ex = assertThrows(BusinessException.class, () -> orderService.pay(1000L));
@@ -194,15 +202,60 @@ class OrderServiceTest {
         when(redissonClient.getLock(anyString())).thenReturn(lock);
         when(lock.tryLock(anyLong(), anyLong(), any(TimeUnit.class))).thenReturn(true);
         when(lock.isHeldByCurrentThread()).thenReturn(true);
-        when(orderInfoMapper.selectById(1000L)).thenReturn(order);
-        when(userInfoMapper.selectById(2L)).thenReturn(seller);
+        when(orderInfoMapper.selectByIdForUpdate(1000L)).thenReturn(order);
+        when(userInfoMapper.creditBalance(2L, new BigDecimal("104.00"))).thenReturn(1);
 
         // Act
         assertDoesNotThrow(() -> orderService.confirm(1000L));
 
         // Assert
-        verify(userInfoMapper).updateById(seller);
-        assertEquals(new BigDecimal("604.00"), seller.getMoney()); // 500 + 104
+        verify(userInfoMapper).creditBalance(2L, new BigDecimal("104.00"));
+        verify(userInfoMapper, never()).updateById(any(UserInfo.class));
         assertEquals(3, order.getOrderStatus()); // 已完成
+    }
+
+    @Test
+    void create_faceToFaceOmitsPostageAndSavesSelectedMethod() throws Exception {
+        prepareCreate();
+        goods.setTradeType(2);
+        OrderCreateDTO dto = new OrderCreateDTO();
+        dto.setProductId(100L);
+        dto.setTradeType(0);
+        orderService.create(1L, dto);
+        var saved = org.mockito.ArgumentCaptor.forClass(OrderInfo.class);
+        verify(orderInfoMapper).insert(saved.capture());
+        assertEquals(0, saved.getValue().getTradeType());
+        assertEquals(0, saved.getValue().getDeliveryFee().compareTo(BigDecimal.ZERO));
+        assertEquals(new BigDecimal("99.00"), saved.getValue().getTotalAmount());
+    }
+
+    @Test
+    void create_mixedDeliveryRequiresExplicitChoice() throws Exception {
+        prepareCreate();
+        goods.setTradeType(2);
+        OrderCreateDTO dto = new OrderCreateDTO();
+        dto.setProductId(100L);
+        assertThrows(BusinessException.class, () -> orderService.create(1L, dto));
+        verify(orderInfoMapper, never()).insert(any(OrderInfo.class));
+    }
+
+    @Test
+    void create_rejectsUnsupportedMethod() throws Exception {
+        prepareCreate();
+        goods.setTradeType(0);
+        OrderCreateDTO dto = new OrderCreateDTO();
+        dto.setProductId(100L);
+        dto.setTradeType(1);
+        assertThrows(BusinessException.class, () -> orderService.create(1L, dto));
+        verify(orderInfoMapper, never()).insert(any(OrderInfo.class));
+    }
+
+    private void prepareCreate() throws Exception {
+        when(redissonClient.getLock(anyString())).thenReturn(lock);
+        when(lock.tryLock(anyLong(), anyLong(), any(TimeUnit.class))).thenReturn(true);
+        when(lock.isHeldByCurrentThread()).thenReturn(true);
+        when(userInfoMapper.selectById(1L)).thenReturn(buyer);
+        when(goodsInfoMapper.selectByIdForUpdate(100L)).thenReturn(goods);
+        lenient().when(orderInfoMapper.insert(any(OrderInfo.class))).thenReturn(1);
     }
 }

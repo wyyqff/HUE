@@ -73,7 +73,7 @@ class DisputeServiceImplErrandCreateTest {
         task.setSchoolCode("SC001");
         task.setCampusCode("C001");
         task.setTitle("代取快递");
-        when(errandTaskMapper.selectById(10L)).thenReturn(task);
+        when(errandTaskMapper.selectByIdForUpdate(10L)).thenReturn(task);
 
         DisputeCreateDTO dto = new DisputeCreateDTO();
         dto.setContentId(10L);

@@ -100,7 +100,7 @@ public class DisputeServiceImpl implements DisputeService {
         // 根据类型验证并获取关联信息
         if (DisputeTargetType.ORDER.getCode().equals(dto.getTargetType())) {
             // 商品交易纠纷
-            OrderInfo order = orderInfoMapper.selectById(dto.getContentId());
+            OrderInfo order = orderInfoMapper.selectByIdForUpdate(dto.getContentId());
             if (order == null) {
                 throw new BusinessException("订单不存在");
             }
@@ -108,9 +108,12 @@ public class DisputeServiceImpl implements DisputeService {
             if (!userId.equals(order.getBuyerId()) && !userId.equals(order.getSellerId())) {
                 throw new BusinessException("您无权对此订单发起纠纷");
             }
-            boolean disputeWindowOpen = OrderStatus.PENDING_RECEIVE.getCode().equals(order.getOrderStatus());
+            boolean disputeWindowOpen = OrderStatus.PENDING_RECEIVE.getCode().equals(order.getOrderStatus())
+                    || (userId.equals(order.getBuyerId())
+                    && OrderStatus.PENDING_DELIVERY.getCode().equals(order.getOrderStatus())
+                    && RefundStatus.REJECTED.getCode().equals(order.getRefundStatus()));
             if (!disputeWindowOpen) {
-                throw new BusinessException("当前订单状态不可发起纠纷，仅支持待确认收货订单");
+                throw new BusinessException("仅待验收订单或待交付且退款被拒绝的买家可发起纠纷");
             }
             if (RefundStatus.PENDING.getCode().equals(order.getRefundStatus())) {
                 throw new BusinessException("订单退款处理中，暂不可发起纠纷");
@@ -131,7 +134,7 @@ public class DisputeServiceImpl implements DisputeService {
             }
         } else if (DisputeTargetType.ERRAND.getCode().equals(dto.getTargetType())) {
             // 跑腿劳务纠纷
-            ErrandTask task = errandTaskMapper.selectById(dto.getContentId());
+            ErrandTask task = errandTaskMapper.selectByIdForUpdate(dto.getContentId());
             if (task == null) {
                 throw new BusinessException("跑腿任务不存在");
             }
@@ -238,11 +241,13 @@ public class DisputeServiceImpl implements DisputeService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void withdrawDispute(Long userId, Long recordId) {
-        if (!disputePermissionService.canWithdraw(userId, recordId)) {
+        DisputeRecord record = disputeRecordMapper.selectByIdForUpdate(recordId);
+        if (record == null || userId == null || !userId.equals(record.getInitiatorId())
+                || (!DisputeStatus.PENDING.getCode().equals(record.getHandleStatus())
+                && !DisputeStatus.PROCESSING.getCode().equals(record.getHandleStatus()))) {
             throw new BusinessException("无法撤回此纠纷");
         }
 
-        DisputeRecord record = disputeRecordMapper.selectById(recordId);
         record.setHandleStatus(DisputeStatus.WITHDRAWN.getCode()); // 已撤回
         disputeRecordMapper.updateById(record);
 
@@ -276,13 +281,12 @@ public class DisputeServiceImpl implements DisputeService {
     }
 
     private void doAddEvidence(Long userId, DisputeReplyDTO dto) {
-        if (!disputePermissionService.isParticipant(userId, dto.getRecordId())) {
-            throw new BusinessException("您无权补充此纠纷的证据");
-        }
-
-        DisputeRecord record = disputeRecordMapper.selectById(dto.getRecordId());
+        DisputeRecord record = disputeRecordMapper.selectByIdForUpdate(dto.getRecordId());
         if (record == null) {
             throw new BusinessException("纠纷记录不存在");
+        }
+        if (userId == null || (!userId.equals(record.getInitiatorId()) && !userId.equals(record.getRelatedId()))) {
+            throw new BusinessException("您无权补充此纠纷的证据");
         }
 
         // 只能在待处理或处理中状态补充证据

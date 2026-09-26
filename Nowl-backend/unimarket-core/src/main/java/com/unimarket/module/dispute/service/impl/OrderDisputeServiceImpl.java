@@ -31,7 +31,7 @@ public class OrderDisputeServiceImpl implements OrderDisputeService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void applyDispute(Long userId, OrderDisputeApplyDTO dto) {
-        OrderInfo order = orderInfoMapper.selectById(dto.getOrderId());
+        OrderInfo order = orderInfoMapper.selectByIdForUpdate(dto.getOrderId());
         if (order == null) {
             throw new BusinessException("订单不存在");
         }
@@ -39,7 +39,10 @@ public class OrderDisputeServiceImpl implements OrderDisputeService {
         if (!isParticipant) {
             throw new BusinessException("无权对该订单发起纠纷");
         }
-        boolean disputeWindowOpen = OrderStatus.PENDING_RECEIVE.getCode().equals(order.getOrderStatus());
+        boolean disputeWindowOpen = OrderStatus.PENDING_RECEIVE.getCode().equals(order.getOrderStatus())
+                || (userId.equals(order.getBuyerId())
+                && OrderStatus.PENDING_DELIVERY.getCode().equals(order.getOrderStatus())
+                && RefundStatus.REJECTED.getCode().equals(order.getRefundStatus()));
         if (!disputeWindowOpen) {
             throw new BusinessException("当前订单状态不支持发起纠纷");
         }

@@ -110,6 +110,7 @@ public class UserInfo implements Serializable {
     /**
      * 账户余额（模拟支付）
      */
+    @TableField(updateStrategy = FieldStrategy.NEVER)
     private BigDecimal money;
 
     /**

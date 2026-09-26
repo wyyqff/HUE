@@ -2,6 +2,8 @@ package com.unimarket.module.goods.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import lombok.Data;
 import org.hibernate.validator.constraints.Length;
 import org.hibernate.validator.constraints.Range;
@@ -31,11 +33,15 @@ public class GoodsPublishDTO {
      * 商品价格
      */
     @NotNull(message = "商品价格不能为空")
+    @DecimalMin(value = "0.01", message = "商品价格不能低于0.01元")
+    @Digits(integer = 8, fraction = 2, message = "商品价格最多8位整数和2位小数")
     private BigDecimal price;
 
     /**
      * 商品原价
      */
+    @DecimalMin(value = "0.00", message = "商品原价不能为负数")
+    @Digits(integer = 8, fraction = 2, message = "商品原价最多8位整数和2位小数")
     private BigDecimal originalPrice;
 
     /**
@@ -69,6 +75,8 @@ public class GoodsPublishDTO {
     /**
      * 运费
      */
+    @DecimalMin(value = "0.00", message = "运费不能为负数")
+    @Digits(integer = 6, fraction = 2, message = "运费最多6位整数和2位小数")
     private BigDecimal deliveryFee;
 
     /**

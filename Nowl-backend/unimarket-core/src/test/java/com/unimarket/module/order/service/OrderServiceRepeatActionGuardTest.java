@@ -93,6 +93,7 @@ class OrderServiceRepeatActionGuardTest {
         order.setSellerId(200L);
         order.setProductId(900L);
         order.setTotalAmount(new BigDecimal("50.00"));
+        order.setOrderAmount(new BigDecimal("50.00"));
         order.setOrderStatus(OrderStatus.PENDING_PAYMENT.getCode());
 
         GoodsInfo goods = new GoodsInfo();
@@ -104,16 +105,17 @@ class OrderServiceRepeatActionGuardTest {
         buyer.setUserId(100L);
         buyer.setMoney(new BigDecimal("500.00"));
 
-        when(orderInfoMapper.selectById(orderId)).thenReturn(order);
-        when(goodsInfoMapper.selectById(900L)).thenReturn(goods);
-        when(userInfoMapper.selectById(100L)).thenReturn(buyer);
+        when(orderInfoMapper.selectByIdForUpdate(orderId)).thenReturn(order);
+        when(goodsInfoMapper.selectByIdForUpdate(900L)).thenReturn(goods);
+        when(userInfoMapper.debitBalance(100L, new BigDecimal("50.00"))).thenReturn(1);
+        when(goodsInfoMapper.markSoldIfAvailable(900L)).thenReturn(1);
 
         assertDoesNotThrow(() -> orderService.pay(orderId));
 
         BusinessException ex = assertThrows(BusinessException.class, () -> orderService.pay(orderId));
         assertTrue(ex.getMessage().contains("订单状态不正确"));
 
-        verify(userInfoMapper, times(1)).updateById(any(UserInfo.class));
+        verify(userInfoMapper, times(1)).debitBalance(100L, new BigDecimal("50.00"));
         verify(orderInfoMapper, times(1)).updateById(any(OrderInfo.class));
     }
 
@@ -131,13 +133,14 @@ class OrderServiceRepeatActionGuardTest {
         order.setProductId(901L);
         order.setOrderStatus(OrderStatus.PENDING_RECEIVE.getCode());
         order.setTotalAmount(new BigDecimal("88.00"));
+        order.setOrderAmount(new BigDecimal("88.00"));
         order.setRefundStatus(RefundStatus.NONE.getCode());
 
         RefundApplyDTO dto = new RefundApplyDTO();
         dto.setReason("收到商品与描述不符");
-        dto.setAmount(new BigDecimal("20.00"));
+        dto.setAmount(new BigDecimal("88.00"));
 
-        when(orderInfoMapper.selectById(orderId)).thenReturn(order);
+        when(orderInfoMapper.selectByIdForUpdate(orderId)).thenReturn(order);
         when(disputeRecordMapper.selectCount(any())).thenReturn(0L);
 
         assertDoesNotThrow(() -> orderService.applyRefund(orderId, buyerId, dto));

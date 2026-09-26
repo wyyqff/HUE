@@ -57,11 +57,15 @@ public class AdminErrandDomainService {
     }
 
     private void doAuditErrand(Long operatorId, Long taskId, Integer status, String reason) {
-        ErrandTask task = errandTaskMapper.selectById(taskId);
+        ErrandTask task = errandTaskMapper.selectByIdForUpdate(taskId);
         if (task == null) {
             throw new BusinessException("跑腿任务不存在");
         }
         iamAccessService.assertCanManageScope(operatorId, task.getSchoolCode(), task.getCampusCode());
+        if (ErrandStatus.CANCELLED.getCode().equals(task.getTaskStatus())
+                || ErrandStatus.COMPLETED.getCode().equals(task.getTaskStatus())) {
+            throw new BusinessException("跑腿任务已结束，不可重复审核或退款");
+        }
 
         if (status == null || (status != 1 && status != 2)) {
             throw new BusinessException("审核状态仅支持 1-通过 或 2-驳回");
@@ -127,14 +131,8 @@ public class AdminErrandDomainService {
         if (reward == null || reward.compareTo(BigDecimal.ZERO) <= 0) {
             return;
         }
-        UserInfo publisher = userInfoMapper.selectById(task.getPublisherId());
-        if (publisher == null) {
-            throw new BusinessException("任务发布者不存在，无法退还悬赏金额");
-        }
-        publisher.setMoney(publisher.getMoney().add(reward));
-        int updated = userInfoMapper.updateById(publisher);
-        if (updated <= 0) {
-            throw new BusinessException("退还悬赏金额失败");
+        if (userInfoMapper.creditBalance(task.getPublisherId(), reward) != 1) {
+            throw new BusinessException("发布者账户不存在或退还悬赏金额失败");
         }
         log.info("人工复核驳回后已退还悬赏金额: taskId={}, publisherId={}, reward={}",
                 task.getTaskId(), task.getPublisherId(), reward);

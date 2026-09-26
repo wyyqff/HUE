@@ -17,6 +17,7 @@ import com.unimarket.common.exception.BusinessException;
 import com.unimarket.common.mq.GoodsSyncMessage;
 import com.unimarket.common.result.PageResult;
 import com.unimarket.common.result.ResultCode;
+import com.unimarket.common.utils.MoneyValidator;
 import com.unimarket.module.goods.entity.GoodsInfo;
 import com.unimarket.module.goods.mapper.GoodsInfoMapper;
 import com.unimarket.module.dispute.entity.DisputeRecord;
@@ -42,6 +43,8 @@ import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -70,6 +73,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderDelayMessageService orderDelayMessageService;
     private final CreditScoreService creditScoreService;
     private final RocketMQTemplate rocketMQTemplate;
+    private final PlatformTransactionManager transactionManager;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -77,14 +81,14 @@ public class OrderServiceImpl implements OrderService {
         // 获取分布式锁，锁粒度为商品ID，防止同一商品并发下单
         String lockKey = "order:lock:goods:" + dto.getProductId();
         RLock lock = redissonClient.getLock(lockKey);
-        
+
         try {
             // 尝试获取锁，等待3秒，持有10秒自动释放
             boolean acquired = lock.tryLock(3, 10, TimeUnit.SECONDS);
             if (!acquired) {
                 throw new BusinessException("系统繁忙，请稍后重试");
             }
-            
+
             // 1. 查询买家信息（权限校验已在Controller层通过@PreAuthorize完成）
             UserInfo buyer = userInfoMapper.selectById(userId);
             if (buyer == null) {
@@ -92,7 +96,7 @@ public class OrderServiceImpl implements OrderService {
             }
 
             // 2. 查询商品信息
-            GoodsInfo goodsInfo = goodsInfoMapper.selectById(dto.getProductId());
+            GoodsInfo goodsInfo = goodsInfoMapper.selectByIdForUpdate(dto.getProductId());
             if (goodsInfo == null) {
                 throw new BusinessException("商品不存在");
             }
@@ -121,6 +125,13 @@ public class OrderServiceImpl implements OrderService {
                 throw new BusinessException("仅支持同学校范围内下单");
             }
 
+            MoneyValidator.requireValid(goodsInfo.getPrice(), false, "商品价格");
+            BigDecimal advertisedFee = goodsInfo.getDeliveryFee() == null ? BigDecimal.ZERO : goodsInfo.getDeliveryFee();
+            MoneyValidator.requireValid(advertisedFee, true, "运费");
+            int tradeType = resolveTradeType(goodsInfo.getTradeType(), dto.getTradeType());
+            BigDecimal deliveryFee = tradeType == 0 ? BigDecimal.ZERO : advertisedFee;
+            MoneyValidator.requireValid(goodsInfo.getPrice().add(deliveryFee), false, "订单总额");
+
             // 创建订单
             OrderInfo orderInfo = new OrderInfo();
             orderInfo.setOrderNo(generateOrderNo());
@@ -130,7 +141,8 @@ public class OrderServiceImpl implements OrderService {
             orderInfo.setSchoolCode(goodsInfo.getSchoolCode());
             orderInfo.setCampusCode(goodsInfo.getCampusCode());
             orderInfo.setOrderAmount(goodsInfo.getPrice());
-            orderInfo.setDeliveryFee(goodsInfo.getDeliveryFee() != null ? goodsInfo.getDeliveryFee() : BigDecimal.ZERO);
+            orderInfo.setTradeType(tradeType);
+            orderInfo.setDeliveryFee(deliveryFee);
             orderInfo.setTotalAmount(orderInfo.getOrderAmount().add(orderInfo.getDeliveryFee()));
             orderInfo.setOrderStatus(OrderStatus.PENDING_PAYMENT.getCode()); // 待支付
             orderInfo.setRemark(dto.getRemark());
@@ -143,7 +155,7 @@ public class OrderServiceImpl implements OrderService {
             }
 
             log.info("用户{}创建订单成功，订单号：{}", userId, orderInfo.getOrderNo());
-            
+
             // 发送通知给卖家
             noticeService.sendNotice(
                     goodsInfo.getSellerId(),
@@ -151,7 +163,7 @@ public class OrderServiceImpl implements OrderService {
                     "您的商品 [" + goodsInfo.getTitle() + "] 有新订单了，请及时处理。",
                     NoticeType.TRADE.getCode()
             );
-            
+
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new BusinessException("下单过程中断");
@@ -192,7 +204,7 @@ public class OrderServiceImpl implements OrderService {
         } else {
             throw new BusinessException("订单类型不合法，仅支持 buy 或 sell");
         }
-        
+
         wrapper.eq(dto.getOrderStatus() != null, OrderInfo::getOrderStatus, dto.getOrderStatus())
                 .orderByDesc(OrderInfo::getCreateTime);
 
@@ -218,7 +230,7 @@ public class OrderServiceImpl implements OrderService {
                 throw new BusinessException("系统繁忙，请稍后重试");
             }
             // 查询订单
-            OrderInfo orderInfo = orderInfoMapper.selectById(orderId);
+            OrderInfo orderInfo = orderInfoMapper.selectByIdForUpdate(orderId);
             if (orderInfo == null) {
                 throw new BusinessException("订单不存在");
             }
@@ -226,6 +238,7 @@ public class OrderServiceImpl implements OrderService {
             if (!OrderStatus.PENDING_PAYMENT.getCode().equals(orderInfo.getOrderStatus())) {
                 throw new BusinessException("订单状态不正确");
             }
+            validateOrderAmounts(orderInfo);
             // 再加商品维度锁，避免同一商品多个待支付订单并发支付造成超卖
             String goodsLockKey = "order:lock:goods:" + orderInfo.getProductId();
             RLock goodsLock = redissonClient.getLock(goodsLockKey);
@@ -235,36 +248,22 @@ public class OrderServiceImpl implements OrderService {
                 if (!goodsLockAcquired) {
                     throw new BusinessException("系统繁忙，请稍后重试");
                 }
-                GoodsInfo goodsInfo = goodsInfoMapper.selectById(orderInfo.getProductId());
+                GoodsInfo goodsInfo = goodsInfoMapper.selectByIdForUpdate(orderInfo.getProductId());
                 if (goodsInfo == null) {
                     throw new BusinessException("商品不存在");
                 }
                 if (!TradeStatus.ON_SALE.getCode().equals(goodsInfo.getTradeStatus())) {
-                    orderInfo.setOrderStatus(OrderStatus.CANCELLED.getCode());
-                    orderInfo.setCancelTime(LocalDateTime.now());
-                    orderInfoMapper.updateById(orderInfo);
-                    throw new BusinessException("商品状态已变化，订单已自动取消");
+                    throw new BusinessException("商品已下架或售出，无法支付，请取消订单");
                 }
                 boolean reviewPassed = ReviewStatus.AI_PASSED.getCode().equals(goodsInfo.getReviewStatus())
                         || ReviewStatus.MANUAL_PASSED.getCode().equals(goodsInfo.getReviewStatus());
                 if (!reviewPassed) {
-                    orderInfo.setOrderStatus(OrderStatus.CANCELLED.getCode());
-                    orderInfo.setCancelTime(LocalDateTime.now());
-                    orderInfoMapper.updateById(orderInfo);
-                    throw new BusinessException("商品审核状态已变化，订单已自动取消");
+                    throw new BusinessException("商品审核状态已变化，无法支付，请取消订单");
                 }
-                // 查询买家信息
-                UserInfo buyer = userInfoMapper.selectById(orderInfo.getBuyerId());
-                if (buyer == null) {
-                    throw new BusinessException("用户不存在");
+                // 原子扣款同时检查余额；不同订单使用同一账户也不会覆盖余额。
+                if (userInfoMapper.debitBalance(orderInfo.getBuyerId(), orderInfo.getTotalAmount()) != 1) {
+                    throw new BusinessException("余额不足或账户不存在");
                 }
-                // 检查余额
-                if (buyer.getMoney().compareTo(orderInfo.getTotalAmount()) < 0) {
-                    throw new BusinessException("余额不足");
-                }
-                // 扣减买家余额
-                buyer.setMoney(buyer.getMoney().subtract(orderInfo.getTotalAmount()));
-                userInfoMapper.updateById(buyer);
                 // 注意：此时不增加卖家余额，资金暂时托管在平台
                 // 等买家确认收货或超时自动收货后，再转入卖家账户
                 // 更新订单状态
@@ -272,8 +271,9 @@ public class OrderServiceImpl implements OrderService {
                 orderInfo.setPayTime(LocalDateTime.now());
                 orderInfoMapper.updateById(orderInfo);
                 // 更新商品状态
-                goodsInfo.setTradeStatus(TradeStatus.SOLD.getCode()); // 已售出
-                goodsInfoMapper.updateById(goodsInfo);
+                if (goodsInfoMapper.markSoldIfAvailable(orderInfo.getProductId()) != 1) {
+                    throw new BusinessException("商品状态已变化，请重试");
+                }
                 notifyGoodsStatusChanged(orderInfo.getProductId());
             } finally {
                 if (goodsLockAcquired && goodsLock.isHeldByCurrentThread()) {
@@ -281,7 +281,7 @@ public class OrderServiceImpl implements OrderService {
                 }
             }
             log.info("买家{}支付订单成功，订单号：{}，金额：{}", orderInfo.getBuyerId(), orderInfo.getOrderNo(), orderInfo.getTotalAmount());
-            
+
             // 发送通知给卖家
             noticeService.sendNotice(
                     orderInfo.getSellerId(),
@@ -305,15 +305,15 @@ public class OrderServiceImpl implements OrderService {
         // 获取分布式锁，锁粒度为订单ID，串行化订单状态流转
         String lockKey = "order:lock:lifecycle:" + orderId;
         RLock lock = redissonClient.getLock(lockKey);
-        
+
         try {
             boolean acquired = lock.tryLock(3, 10, TimeUnit.SECONDS);
             if (!acquired) {
                 throw new BusinessException("系统繁忙，请稍后重试");
             }
-            
+
             // 查询订单
-            OrderInfo orderInfo = orderInfoMapper.selectById(orderId);
+            OrderInfo orderInfo = orderInfoMapper.selectByIdForUpdate(orderId);
             if (orderInfo == null) {
                 throw new BusinessException("订单不存在");
             }
@@ -322,18 +322,24 @@ public class OrderServiceImpl implements OrderService {
             if (!OrderStatus.PENDING_DELIVERY.getCode().equals(orderInfo.getOrderStatus())) {
                 throw new BusinessException("订单状态不正确，无法发货");
             }
+            if (RefundStatus.PENDING.getCode().equals(orderInfo.getRefundStatus())) {
+                throw new BusinessException("订单退款处理中，暂不可交付");
+            }
+            if (hasActiveOrderDispute(orderId)) {
+                throw new BusinessException("订单存在进行中纠纷，暂不可交付");
+            }
 
             // 更新订单状态
             orderInfo.setOrderStatus(OrderStatus.PENDING_RECEIVE.getCode()); // 待收货
             orderInfo.setDeliveryTime(LocalDateTime.now());
             orderInfoMapper.updateById(orderInfo);
-            
+
             // 发送自动确认收货延时消息（7天后自动确认）
             long deliveryTimestamp = orderInfo.getDeliveryTime().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
             orderDelayMessageService.sendAutoConfirmMessage(orderId, deliveryTimestamp);
 
             log.info("卖家{}发货成功，订单号：{}，已加入自动确认队列", orderInfo.getSellerId(), orderInfo.getOrderNo());
-            
+
             // 发送通知给买家
             noticeService.sendNotice(
                     orderInfo.getBuyerId(),
@@ -341,7 +347,7 @@ public class OrderServiceImpl implements OrderService {
                     "您的订单 [" + orderInfo.getOrderNo() + "] 卖家已发货，请注意查收。7天后将自动确认收货。",
                     NoticeType.TRADE.getCode()
             );
-            
+
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new BusinessException("发货过程中断");
@@ -358,15 +364,15 @@ public class OrderServiceImpl implements OrderService {
         // 获取分布式锁，锁粒度为订单ID，串行化订单状态流转
         String lockKey = "order:lock:lifecycle:" + orderId;
         RLock lock = redissonClient.getLock(lockKey);
-        
+
         try {
             boolean acquired = lock.tryLock(3, 10, TimeUnit.SECONDS);
             if (!acquired) {
                 throw new BusinessException("系统繁忙，请稍后重试");
             }
-            
+
             // 查询订单
-            OrderInfo orderInfo = orderInfoMapper.selectById(orderId);
+            OrderInfo orderInfo = orderInfoMapper.selectByIdForUpdate(orderId);
             if (orderInfo == null) {
                 throw new BusinessException("订单不存在");
             }
@@ -385,10 +391,9 @@ public class OrderServiceImpl implements OrderService {
             }
 
             // 资金结算：转入卖家账户
-            UserInfo seller = userInfoMapper.selectById(orderInfo.getSellerId());
-            if (seller != null) {
-                seller.setMoney(seller.getMoney().add(orderInfo.getTotalAmount()));
-                userInfoMapper.updateById(seller);
+            validateOrderAmounts(orderInfo);
+            if (userInfoMapper.creditBalance(orderInfo.getSellerId(), orderInfo.getTotalAmount()) != 1) {
+                throw new BusinessException("卖家账户不存在，无法结算");
             }
 
             // 更新订单状态
@@ -397,7 +402,7 @@ public class OrderServiceImpl implements OrderService {
             orderInfoMapper.updateById(orderInfo);
 
             log.info("买家{}确认收货成功，订单号：{}，卖家收款：{}", orderInfo.getBuyerId(), orderInfo.getOrderNo(), orderInfo.getTotalAmount());
-            
+
             // 发送通知给卖家
             noticeService.sendNotice(
                     orderInfo.getSellerId(),
@@ -405,7 +410,7 @@ public class OrderServiceImpl implements OrderService {
                     "订单 [" + orderInfo.getOrderNo() + "] 买家已确认收货，资金已入账。",
                     NoticeType.TRADE.getCode()
             );
-            
+
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new BusinessException("确认收货过程中断");
@@ -427,7 +432,7 @@ public class OrderServiceImpl implements OrderService {
                 throw new BusinessException("系统繁忙，请稍后重试");
             }
 
-            OrderInfo orderInfo = orderInfoMapper.selectById(orderId);
+            OrderInfo orderInfo = orderInfoMapper.selectByIdForUpdate(orderId);
             if (orderInfo == null) {
                 throw new BusinessException("订单不存在");
             }
@@ -462,7 +467,7 @@ public class OrderServiceImpl implements OrderService {
             if (!acquired) {
                 throw new BusinessException("系统繁忙，请稍后重试");
             }
-            OrderInfo orderInfo = orderInfoMapper.selectById(orderId);
+            OrderInfo orderInfo = orderInfoMapper.selectByIdForUpdate(orderId);
             if (orderInfo == null) {
                 throw new BusinessException("订单不存在");
             }
@@ -480,8 +485,10 @@ public class OrderServiceImpl implements OrderService {
             if (hasActiveOrderDispute(orderId)) {
                 throw new BusinessException("订单存在进行中纠纷，暂不可申请退款");
             }
-            if (dto.getAmount().compareTo(orderInfo.getTotalAmount()) > 0) {
-                throw new BusinessException("退款金额不能超过实付金额");
+            validateOrderAmounts(orderInfo);
+            MoneyValidator.requireValid(dto.getAmount(), false, "退款金额");
+            if (dto.getAmount().compareTo(orderInfo.getTotalAmount()) != 0) {
+                throw new BusinessException("当前仅支持全额退款，退款金额须等于实付金额");
             }
             orderInfo.setRefundStatus(RefundStatus.PENDING.getCode());
             orderInfo.setRefundReason(dto.getReason());
@@ -510,20 +517,23 @@ public class OrderServiceImpl implements OrderService {
                 return;
             }
             orderInfo.setRefundFastTrack(0);
-            orderInfo.setRefundDeadline(LocalDateTime.now().plusHours(24));
+            boolean beforeDelivery = OrderStatus.PENDING_DELIVERY.getCode().equals(orderInfo.getOrderStatus());
+            orderInfo.setRefundDeadline(beforeDelivery ? LocalDateTime.now().plusHours(24) : null);
             orderInfoMapper.updateById(orderInfo);
 
             noticeService.sendNotice(
                     orderInfo.getSellerId(),
                     "收到退款申请",
-                    "订单 [" + orderInfo.getOrderNo() + "] 买家申请退款，请在24小时内处理。",
+                    "订单 [" + orderInfo.getOrderNo() + "] 买家申请退款，"
+                            + (beforeDelivery ? "请在24小时内处理。" : "请协商退货并处理，已交付订单不会超时自动退款。"),
                     NoticeType.TRADE.getCode(),
                     orderId
             );
             noticeService.sendNotice(
                     orderInfo.getBuyerId(),
                     "退款申请已提交",
-                    "您的退款申请已提交，卖家需在24小时内处理，超时将自动退款。",
+                    beforeDelivery ? "您的退款申请已提交，卖家需在24小时内处理，超时将自动退款。"
+                            : "您的退款申请已提交，请与卖家协商退货；已交付订单需卖家同意或平台裁定后退款。",
                     NoticeType.TRADE.getCode(),
                     orderId
             );
@@ -548,7 +558,7 @@ public class OrderServiceImpl implements OrderService {
                 throw new BusinessException("系统繁忙，请稍后重试");
             }
 
-            OrderInfo orderInfo = orderInfoMapper.selectById(orderId);
+            OrderInfo orderInfo = orderInfoMapper.selectByIdForUpdate(orderId);
             if (orderInfo == null) {
                 throw new BusinessException("订单不存在");
             }
@@ -603,12 +613,12 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     @Scheduled(cron = "0 */10 * * * ?")
     public void autoProcessRefunds() {
         LocalDateTime now = LocalDateTime.now();
         LambdaQueryWrapper<OrderInfo> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(OrderInfo::getRefundStatus, RefundStatus.PENDING.getCode())
+                .eq(OrderInfo::getOrderStatus, OrderStatus.PENDING_DELIVERY.getCode())
                 .le(OrderInfo::getRefundDeadline, now);
 
         List<OrderInfo> timeoutOrders = orderInfoMapper.selectList(wrapper);
@@ -626,32 +636,35 @@ public class OrderServiceImpl implements OrderService {
                     log.debug("自动退款跳过，订单正在处理: orderId={}", order.getOrderId());
                     continue;
                 }
-                OrderInfo latestOrder = orderInfoMapper.selectById(order.getOrderId());
-                if (latestOrder == null) {
-                    continue;
-                }
-                boolean stillPendingRefund = RefundStatus.PENDING.getCode().equals(latestOrder.getRefundStatus());
-                boolean timeoutReached = latestOrder.getRefundDeadline() != null
-                        && !latestOrder.getRefundDeadline().isAfter(now);
-                if (!stillPendingRefund || !timeoutReached) {
-                    continue;
-                }
+                new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+                    OrderInfo latestOrder = orderInfoMapper.selectByIdForUpdate(order.getOrderId());
+                    if (latestOrder == null) {
+                        return;
+                    }
+                    boolean stillPendingRefund = RefundStatus.PENDING.getCode().equals(latestOrder.getRefundStatus());
+                    boolean stillBeforeDelivery = OrderStatus.PENDING_DELIVERY.getCode().equals(latestOrder.getOrderStatus());
+                    boolean timeoutReached = latestOrder.getRefundDeadline() != null
+                            && !latestOrder.getRefundDeadline().isAfter(now);
+                    if (!stillPendingRefund || !stillBeforeDelivery || !timeoutReached) {
+                        return;
+                    }
 
-                finalizeRefund(latestOrder, 0L, "卖家超时未处理，系统自动退款", false, true);
-                noticeService.sendNotice(
-                        latestOrder.getBuyerId(),
-                        "退款已自动通过",
-                        "订单 [" + latestOrder.getOrderNo() + "] 卖家超时未处理，系统已自动退款。",
-                        NoticeType.TRADE.getCode(),
-                        latestOrder.getOrderId()
-                );
-                noticeService.sendNotice(
-                        latestOrder.getSellerId(),
-                        "退款已自动处理",
-                        "订单 [" + latestOrder.getOrderNo() + "] 因超时未处理，系统已自动退款。",
-                        NoticeType.TRADE.getCode(),
-                        latestOrder.getOrderId()
-                );
+                    finalizeRefund(latestOrder, 0L, "卖家超时未处理，系统自动退款", false, true);
+                    noticeService.sendNotice(
+                            latestOrder.getBuyerId(),
+                            "退款已自动通过",
+                            "订单 [" + latestOrder.getOrderNo() + "] 卖家超时未处理，系统已自动退款。",
+                            NoticeType.TRADE.getCode(),
+                            latestOrder.getOrderId()
+                    );
+                    noticeService.sendNotice(
+                            latestOrder.getSellerId(),
+                            "退款已自动处理",
+                            "订单 [" + latestOrder.getOrderNo() + "] 因超时未处理，系统已自动退款。",
+                            NoticeType.TRADE.getCode(),
+                            latestOrder.getOrderId()
+                    );
+                });
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 log.warn("自动处理退款被中断，orderId={}", order.getOrderId());
@@ -670,20 +683,19 @@ public class OrderServiceImpl implements OrderService {
      * 每天凌晨执行，查询发货超过7天的订单，自动确认收货
      */
     @Scheduled(cron = "0 0 0 * * ?")
-    @Transactional(rollbackFor = Exception.class)
     public void autoConfirmReceipt() {
         log.info("开始执行订单自动确认收货任务...");
-        
+
         // 查询发货超过7天的订单（状态为2-待收货）
         LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);
         LambdaQueryWrapper<OrderInfo> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(OrderInfo::getOrderStatus, OrderStatus.PENDING_RECEIVE.getCode())
                 .ne(OrderInfo::getRefundStatus, RefundStatus.PENDING.getCode())
                 .le(OrderInfo::getDeliveryTime, sevenDaysAgo);
-        
+
         List<OrderInfo> orders = orderInfoMapper.selectList(wrapper);
         log.info("发现{}个超时未确认订单", orders.size());
-        
+
         for (OrderInfo order : orders) {
             String lockKey = "order:lock:lifecycle:" + order.getOrderId();
             RLock lock = redissonClient.getLock(lockKey);
@@ -694,50 +706,51 @@ public class OrderServiceImpl implements OrderService {
                     log.debug("自动确认跳过，订单正在处理: orderId={}", order.getOrderId());
                     continue;
                 }
-                OrderInfo latestOrder = orderInfoMapper.selectById(order.getOrderId());
-                if (latestOrder == null) {
-                    continue;
-                }
-                boolean canAutoConfirm = OrderStatus.PENDING_RECEIVE.getCode().equals(latestOrder.getOrderStatus())
-                        && !RefundStatus.PENDING.getCode().equals(latestOrder.getRefundStatus())
-                        && latestOrder.getDeliveryTime() != null
-                        && !latestOrder.getDeliveryTime().isAfter(sevenDaysAgo);
-                if (!canAutoConfirm) {
-                    continue;
-                }
+                new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+                    OrderInfo latestOrder = orderInfoMapper.selectByIdForUpdate(order.getOrderId());
+                    if (latestOrder == null) {
+                        return;
+                    }
+                    boolean canAutoConfirm = OrderStatus.PENDING_RECEIVE.getCode().equals(latestOrder.getOrderStatus())
+                            && !RefundStatus.PENDING.getCode().equals(latestOrder.getRefundStatus())
+                            && latestOrder.getDeliveryTime() != null
+                            && !latestOrder.getDeliveryTime().isAfter(sevenDaysAgo);
+                    if (!canAutoConfirm) {
+                        return;
+                    }
 
-                if (hasActiveOrderDispute(latestOrder.getOrderId())) {
-                    log.info("订单存在进行中纠纷，跳过自动确认收货: orderId={}", latestOrder.getOrderId());
-                    continue;
-                }
+                    if (hasActiveOrderDispute(latestOrder.getOrderId())) {
+                        log.info("订单存在进行中纠纷，跳过自动确认收货: orderId={}", latestOrder.getOrderId());
+                        return;
+                    }
 
-                // 资金结算：转入卖家账户
-                UserInfo seller = userInfoMapper.selectById(latestOrder.getSellerId());
-                if (seller != null) {
-                    seller.setMoney(seller.getMoney().add(latestOrder.getTotalAmount()));
-                    userInfoMapper.updateById(seller);
-                }
+                    // 资金结算：转入卖家账户
+                    validateOrderAmounts(latestOrder);
+                    if (userInfoMapper.creditBalance(latestOrder.getSellerId(), latestOrder.getTotalAmount()) != 1) {
+                        throw new BusinessException("卖家账户不存在，无法结算");
+                    }
 
-                // 更新订单状态
-                latestOrder.setOrderStatus(OrderStatus.COMPLETED.getCode()); // 已完成
-                latestOrder.setReceiveTime(LocalDateTime.now());
-                orderInfoMapper.updateById(latestOrder);
-                
-                log.info("订单{}自动确认收货成功", latestOrder.getOrderNo());
-                
-                // 发送通知
-                noticeService.sendNotice(
-                        latestOrder.getBuyerId(),
-                        "自动收货通知",
-                        "您的订单 [" + latestOrder.getOrderNo() + "] 因超时未确认已自动收货。",
-                        NoticeType.TRADE.getCode()
-                );
-                noticeService.sendNotice(
-                        latestOrder.getSellerId(),
-                        "交易完成",
-                        "订单 [" + latestOrder.getOrderNo() + "] 已自动确认收货，资金已入账。",
-                        NoticeType.TRADE.getCode()
-                );
+                    // 更新订单状态
+                    latestOrder.setOrderStatus(OrderStatus.COMPLETED.getCode()); // 已完成
+                    latestOrder.setReceiveTime(LocalDateTime.now());
+                    orderInfoMapper.updateById(latestOrder);
+
+                    log.info("订单{}自动确认收货成功", latestOrder.getOrderNo());
+
+                    // 发送通知
+                    noticeService.sendNotice(
+                            latestOrder.getBuyerId(),
+                            "自动收货通知",
+                            "您的订单 [" + latestOrder.getOrderNo() + "] 因超时未确认已自动收货。",
+                            NoticeType.TRADE.getCode()
+                    );
+                    noticeService.sendNotice(
+                            latestOrder.getSellerId(),
+                            "交易完成",
+                            "订单 [" + latestOrder.getOrderNo() + "] 已自动确认收货，资金已入账。",
+                            NoticeType.TRADE.getCode()
+                    );
+                });
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 log.warn("自动确认收货被中断，orderId={}", order.getOrderId());
@@ -749,7 +762,7 @@ public class OrderServiceImpl implements OrderService {
                 }
             }
         }
-        
+
         log.info("订单自动确认收货任务执行完毕");
     }
 
@@ -760,20 +773,31 @@ public class OrderServiceImpl implements OrderService {
             boolean fastTrack,
             boolean closeWithCancelStatus
     ) {
-        UserInfo buyer = userInfoMapper.selectById(orderInfo.getBuyerId());
-        if (buyer == null) {
-            throw new BusinessException("买家不存在");
+        if (!OrderStatus.PENDING_DELIVERY.getCode().equals(orderInfo.getOrderStatus())
+                && !OrderStatus.PENDING_RECEIVE.getCode().equals(orderInfo.getOrderStatus())) {
+            throw new BusinessException("当前订单状态不可退款");
         }
-
+        validateOrderAmounts(orderInfo);
         BigDecimal refundAmount = orderInfo.getRefundAmount() == null
                 ? orderInfo.getTotalAmount()
                 : orderInfo.getRefundAmount();
-        buyer.setMoney(buyer.getMoney().add(refundAmount));
-        userInfoMapper.updateById(buyer);
+        MoneyValidator.requireValid(refundAmount, false, "退款金额");
+        if (refundAmount.compareTo(orderInfo.getTotalAmount()) != 0) {
+            throw new BusinessException("当前仅支持全额退款，请卖家拒绝原部分退款申请后重新申请");
+        }
+        if (userInfoMapper.creditBalance(orderInfo.getBuyerId(), refundAmount) != 1) {
+            throw new BusinessException("买家不存在，无法退款");
+        }
 
-        GoodsInfo goodsInfo = goodsInfoMapper.selectById(orderInfo.getProductId());
+        GoodsInfo goodsInfo = goodsInfoMapper.selectByIdForUpdate(orderInfo.getProductId());
         if (goodsInfo != null) {
-            goodsInfo.setTradeStatus(TradeStatus.ON_SALE.getCode());
+            boolean neverDelivered = OrderStatus.PENDING_DELIVERY.getCode().equals(orderInfo.getOrderStatus());
+            boolean approvedGoods = ReviewStatus.AI_PASSED.getCode().equals(goodsInfo.getReviewStatus())
+                    || ReviewStatus.MANUAL_PASSED.getCode().equals(goodsInfo.getReviewStatus());
+            // 已交付物品须先确认退回；管理员下架也不能被退款流程覆盖。
+            boolean canRelist = neverDelivered && approvedGoods
+                    && TradeStatus.SOLD.getCode().equals(goodsInfo.getTradeStatus());
+            goodsInfo.setTradeStatus(canRelist ? TradeStatus.ON_SALE.getCode() : TradeStatus.OFF_SHELF.getCode());
             goodsInfoMapper.updateById(goodsInfo);
             notifyGoodsStatusChanged(orderInfo.getProductId());
         }
@@ -791,6 +815,35 @@ public class OrderServiceImpl implements OrderService {
         orderInfoMapper.updateById(orderInfo);
 
         log.info("订单{}退款完成，金额：{}", orderInfo.getOrderNo(), refundAmount);
+    }
+
+    private void validateOrderAmounts(OrderInfo order) {
+        MoneyValidator.requireValid(order.getOrderAmount(), false, "商品金额");
+        BigDecimal deliveryFee = order.getDeliveryFee() == null ? BigDecimal.ZERO : order.getDeliveryFee();
+        MoneyValidator.requireValid(deliveryFee, true, "运费");
+        MoneyValidator.requireValid(order.getTotalAmount(), false, "订单总额");
+        if (order.getOrderAmount().add(deliveryFee).compareTo(order.getTotalAmount()) != 0) {
+            throw new BusinessException("订单金额不一致，请联系平台处理");
+        }
+        if (Integer.valueOf(0).equals(order.getTradeType()) && deliveryFee.signum() != 0) {
+            throw new BusinessException("面交订单不应收取运费，请联系平台处理");
+        }
+    }
+
+    private int resolveTradeType(Integer offeredType, Integer selectedType) {
+        if (offeredType == null || offeredType < 0 || offeredType > 2) {
+            throw new BusinessException("商品交付方式缺失或不合法，请联系卖家更新");
+        }
+        if (offeredType == 2) {
+            if (selectedType == null || selectedType < 0 || selectedType > 1) {
+                throw new BusinessException("请明确选择面交或邮寄");
+            }
+            return selectedType;
+        }
+        if (selectedType != null && !selectedType.equals(offeredType)) {
+            throw new BusinessException("商品不支持所选交付方式");
+        }
+        return offeredType;
     }
 
     /**

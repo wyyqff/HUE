@@ -3,6 +3,8 @@ package com.unimarket.module.errand.service.impl;
 import com.unimarket.ai.dto.AiAuditResult;
 import com.unimarket.common.enums.ErrandStatus;
 import com.unimarket.common.enums.ReviewStatus;
+import com.unimarket.common.exception.BusinessException;
+import com.unimarket.common.utils.RedisCache;
 import com.unimarket.common.mq.ErrandSyncMessage;
 import com.unimarket.module.errand.entity.ErrandTask;
 import com.unimarket.module.errand.mapper.ErrandTaskMapper;
@@ -21,6 +23,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -41,9 +45,31 @@ class ErrandAuditServiceImplTest {
     private RocketMQTemplate rocketMQTemplate;
     @Mock
     private UserInfoMapper userInfoMapper;
+    @Mock
+    private RedisCache redisCache;
 
     @InjectMocks
     private ErrandAuditServiceImpl errandAuditService;
+
+    @Test
+    void performAudit_cancelledTaskDoesNotRefundEscrowAgain() {
+        ErrandTask task = new ErrandTask();
+        task.setTaskId(103L);
+        task.setPublisherId(203L);
+        task.setTitle("已取消任务");
+        task.setReward(new BigDecimal("12.50"));
+        task.setTaskStatus(ErrandStatus.CANCELLED.getCode());
+        task.setReviewStatus(ReviewStatus.WAIT_REVIEW.getCode());
+        when(errandTaskMapper.selectByIdForUpdate(103L)).thenReturn(task);
+        org.mockito.Mockito.lenient().when(aiAuditService.auditText(anyString())).thenReturn(new AiAuditResult(false, "违规内容", "high"));
+        org.mockito.Mockito.lenient().when(errandTaskMapper.update(eq(null), any())).thenReturn(1);
+        org.mockito.Mockito.lenient().when(userInfoMapper.creditBalance(203L, new BigDecimal("12.50"))).thenReturn(1);
+
+        errandAuditService.performAudit(103L, 1);
+
+        verify(userInfoMapper, never()).creditBalance(any(), any());
+        verify(errandTaskMapper, never()).update(eq(null), any());
+    }
 
     @Test
     @DisplayName("performAudit: AI驳回时退还悬赏金额并下线任务")
@@ -56,19 +82,15 @@ class ErrandAuditServiceImplTest {
         task.setTaskStatus(ErrandStatus.PENDING.getCode());
         task.setReviewStatus(ReviewStatus.WAIT_REVIEW.getCode());
 
-        UserInfo publisher = new UserInfo();
-        publisher.setUserId(200L);
-        publisher.setMoney(new BigDecimal("30.00"));
-
-        when(errandTaskMapper.selectById(100L)).thenReturn(task);
+        when(errandTaskMapper.selectByIdForUpdate(100L)).thenReturn(task);
         when(aiAuditService.auditText(anyString())).thenReturn(new AiAuditResult(false, "违规内容", "high"));
         when(errandTaskMapper.update(eq(null), any())).thenReturn(1);
-        when(userInfoMapper.selectById(200L)).thenReturn(publisher);
-        when(userInfoMapper.updateById(publisher)).thenReturn(1);
+        org.mockito.Mockito.lenient().when(userInfoMapper.creditBalance(200L, new BigDecimal("12.50"))).thenReturn(1);
 
-        errandAuditService.performAudit(100L, 1);
+        assertDoesNotThrow(() -> errandAuditService.performAudit(100L, 1));
 
-        assertEquals(new BigDecimal("42.50"), publisher.getMoney());
+        verify(userInfoMapper).creditBalance(200L, new BigDecimal("12.50"));
+        verify(userInfoMapper, never()).updateById(any(UserInfo.class));
         assertEquals(ReviewStatus.REJECTED.getCode(), task.getReviewStatus());
         assertEquals("违规内容", task.getAuditReason());
         verify(errandTaskMapper).update(eq(null), any());
@@ -78,6 +100,24 @@ class ErrandAuditServiceImplTest {
         verify(rocketMQTemplate).convertAndSend(eq("errand-sync-topic"), captor.capture());
         assertEquals(ErrandSyncMessage.SyncType.DELETE, captor.getValue().getType());
         assertEquals(100L, captor.getValue().getTaskId());
+    }
+
+    @Test
+    void performAudit_failedRefundStopsSuccessNotice() {
+        ErrandTask task = new ErrandTask();
+        task.setTaskId(102L);
+        task.setPublisherId(202L);
+        task.setTitle("帮我取快递");
+        task.setReward(new BigDecimal("12.50"));
+        task.setTaskStatus(ErrandStatus.PENDING.getCode());
+        task.setReviewStatus(ReviewStatus.WAIT_REVIEW.getCode());
+        when(errandTaskMapper.selectByIdForUpdate(102L)).thenReturn(task);
+        when(aiAuditService.auditText(anyString())).thenReturn(new AiAuditResult(false, "违规内容", "high"));
+        when(errandTaskMapper.update(eq(null), any())).thenReturn(1);
+
+        assertThrows(BusinessException.class, () -> errandAuditService.performAudit(102L, 1));
+
+        verify(noticeService, never()).sendNotice(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -91,7 +131,7 @@ class ErrandAuditServiceImplTest {
         task.setTaskStatus(ErrandStatus.PENDING.getCode());
         task.setReviewStatus(ReviewStatus.WAIT_REVIEW.getCode());
 
-        when(errandTaskMapper.selectById(101L)).thenReturn(task);
+        when(errandTaskMapper.selectByIdForUpdate(101L)).thenReturn(task);
         when(aiAuditService.auditText(anyString())).thenReturn(new AiAuditResult(false, "重复消息", "high"));
         when(errandTaskMapper.update(eq(null), any())).thenReturn(0);
 

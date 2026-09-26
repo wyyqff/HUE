@@ -8,6 +8,7 @@ import com.unimarket.ai.service.AiAuditService;
 import com.unimarket.common.enums.ErrandStatus;
 import com.unimarket.common.enums.NoticeType;
 import com.unimarket.common.enums.ReviewStatus;
+import com.unimarket.common.exception.BusinessException;
 import com.unimarket.common.constant.CacheConstants;
 import com.unimarket.common.mq.ErrandAuditMessage;
 import com.unimarket.common.mq.ErrandSyncMessage;
@@ -17,7 +18,6 @@ import com.unimarket.module.errand.entity.ErrandTask;
 import com.unimarket.module.errand.mapper.ErrandTaskMapper;
 import com.unimarket.module.errand.service.ErrandAuditService;
 import com.unimarket.module.notice.service.NoticeService;
-import com.unimarket.module.user.entity.UserInfo;
 import com.unimarket.module.user.mapper.UserInfoMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -55,9 +55,14 @@ public class ErrandAuditServiceImpl implements ErrandAuditService {
             return;
         }
 
-        ErrandTask task = errandTaskMapper.selectById(taskId);
+        ErrandTask task = errandTaskMapper.selectByIdForUpdate(taskId);
         if (task == null) {
             log.warn("审核跑腿任务不存在: taskId={}", taskId);
+            return;
+        }
+        if (ErrandStatus.CANCELLED.getCode().equals(task.getTaskStatus())
+                || ErrandStatus.COMPLETED.getCode().equals(task.getTaskStatus())) {
+            log.info("跑腿任务已结束，跳过延迟审核: taskId={}", taskId);
             return;
         }
 
@@ -256,14 +261,8 @@ public class ErrandAuditServiceImpl implements ErrandAuditService {
         if (reward == null || reward.compareTo(BigDecimal.ZERO) <= 0) {
             return;
         }
-        UserInfo publisher = userInfoMapper.selectById(task.getPublisherId());
-        if (publisher == null) {
-            throw new IllegalStateException("跑腿任务发布者不存在，无法退还审核失败托管金额");
-        }
-        publisher.setMoney(publisher.getMoney().add(reward));
-        int updated = userInfoMapper.updateById(publisher);
-        if (updated <= 0) {
-            throw new IllegalStateException("退还跑腿任务审核失败托管金额失败");
+        if (userInfoMapper.creditBalance(task.getPublisherId(), reward) != 1) {
+            throw new BusinessException("发布者账户不存在或退还审核失败托管金额失败");
         }
         log.info("跑腿任务审核未通过，已退还托管金额: taskId={}, publisherId={}, reward={}",
                 task.getTaskId(), task.getPublisherId(), reward);

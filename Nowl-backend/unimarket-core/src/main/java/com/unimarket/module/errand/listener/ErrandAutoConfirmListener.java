@@ -3,11 +3,11 @@ package com.unimarket.module.errand.listener;
 import com.unimarket.common.config.RocketMQConfig;
 import com.unimarket.common.enums.ErrandStatus;
 import com.unimarket.common.enums.NoticeType;
+import com.unimarket.common.exception.BusinessException;
 import com.unimarket.module.errand.dto.ErrandAutoConfirmMessage;
 import com.unimarket.module.errand.entity.ErrandTask;
 import com.unimarket.module.errand.mapper.ErrandTaskMapper;
 import com.unimarket.module.notice.service.NoticeService;
-import com.unimarket.module.user.entity.UserInfo;
 import com.unimarket.module.user.mapper.UserInfoMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -56,7 +56,7 @@ public class ErrandAutoConfirmListener implements RocketMQListener<ErrandAutoCon
                 return;
             }
 
-            ErrandTask task = errandTaskMapper.selectById(taskId);
+            ErrandTask task = errandTaskMapper.selectByIdForUpdate(taskId);
             if (task == null) {
                 log.warn("跑腿任务不存在: taskId={}", taskId);
                 return;
@@ -78,14 +78,11 @@ public class ErrandAutoConfirmListener implements RocketMQListener<ErrandAutoCon
             }
 
             // 结算佣金给接单人
-            if (task.getAcceptorId() != null) {
-                UserInfo acceptor = userInfoMapper.selectById(task.getAcceptorId());
-                if (acceptor != null) {
-                    acceptor.setMoney(acceptor.getMoney().add(task.getReward()));
-                    userInfoMapper.updateById(acceptor);
-                    log.info("佣金已自动结算给接单人: acceptorId={}, amount={}", acceptor.getUserId(), task.getReward());
-                }
+            if (task.getAcceptorId() == null
+                    || userInfoMapper.creditBalance(task.getAcceptorId(), task.getReward()) != 1) {
+                throw new BusinessException("接单人账户不存在或佣金结算失败");
             }
+            log.info("佣金已自动结算给接单人: acceptorId={}, amount={}", task.getAcceptorId(), task.getReward());
 
             // 更新任务状态为已完成
             task.setTaskStatus(ErrandStatus.COMPLETED.getCode());

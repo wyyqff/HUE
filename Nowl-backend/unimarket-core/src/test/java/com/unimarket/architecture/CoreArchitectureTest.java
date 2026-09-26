@@ -2,12 +2,13 @@ package com.unimarket.architecture;
 
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
+import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.library.dependencies.SlicesRuleDefinition;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
-@AnalyzeClasses(packages = "com.unimarket")
+@AnalyzeClasses(packages = "com.unimarket", importOptions = ImportOption.DoNotIncludeTests.class)
 class CoreArchitectureTest {
 
     @ArchTest

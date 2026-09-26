@@ -62,6 +62,9 @@ public class OrderInfo implements Serializable {
      */
     private BigDecimal deliveryFee;
 
+    /** 下单时确认的交付方式：0-面交，1-邮寄；历史订单为空。 */
+    private Integer tradeType;
+
     /**
      * 总金额（商品金额+运费）
      */
@@ -120,6 +123,7 @@ public class OrderInfo implements Serializable {
     /**
      * 退款处理截止时间
      */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private LocalDateTime refundDeadline;
 
     /**

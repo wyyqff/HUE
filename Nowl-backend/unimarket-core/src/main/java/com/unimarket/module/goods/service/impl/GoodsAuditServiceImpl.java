@@ -41,7 +41,7 @@ public class GoodsAuditServiceImpl implements GoodsAuditService {
     @Transactional(rollbackFor = Exception.class)
     public void performAudit(Long goodsId, int operationType) {
         log.info("开始审核商品: goodsId={}, operationType={}", goodsId, operationType);
-        GoodsInfo goods = goodsInfoMapper.selectById(goodsId);
+        GoodsInfo goods = goodsInfoMapper.selectByIdForUpdate(goodsId);
         if (goods == null) {
             log.warn("审核商品不存在: {}", goodsId);
             return;

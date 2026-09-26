@@ -167,6 +167,8 @@ export interface OrderInfo {
   sellerId: number
   productId: number
   orderAmount: number
+  /** 订单交付方式快照：0 面交，1 邮寄；历史接口未提供时使用中性交付文案。 */
+  tradeType?: 0 | 1 | null
   deliveryFee: number
   totalAmount: number
   orderStatus: number

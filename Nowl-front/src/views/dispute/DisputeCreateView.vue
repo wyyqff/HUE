@@ -78,7 +78,9 @@ const isOrderEligibleForDispute = computed(() => {
   if (targetType.value !== 0) return true
   const order = orderInfo.value
   if (!order) return false
-  return order.orderStatus === OrderStatus.PENDING_RECEIVE
+  return order.buyerId === userStore.userInfo?.userId
+    && (order.orderStatus === OrderStatus.PENDING_RECEIVE
+      || (order.orderStatus === OrderStatus.PENDING_DELIVERY && Number(order.refundStatus) === 3))
     && !isOrderRefundPending(order)
     && !hasOrderActiveDispute(order)
 })
@@ -126,7 +128,7 @@ const isDisputeEligible = computed(() =>
 
 const disputeEligibilityHint = computed(() => {
   if (targetType.value === 0) {
-    return '当前订单暂不满足纠纷条件（需待确认收货，且不能退款处理中或纠纷处理中）。'
+    return '当前订单暂不满足纠纷条件（仅买家可发起；需待验收，或待交付且退款被拒绝，并且不能退款处理中或纠纷处理中）。'
   }
   return '当前跑腿暂不满足纠纷条件（仅发布者可发起，且任务需已被接单、处于进行中或待确认状态，并且不能已有进行中的纠纷）。'
 })

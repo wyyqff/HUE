@@ -31,7 +31,7 @@ import { normalizeMediaUrl } from '@/utils/media'
 import type { GoodsInfo, RecommendItemVO } from '@/types'
 import { TradeStatus, ReviewStatus } from '@/constants'
 import dayjs from 'dayjs'
-import { ElImageViewer } from 'element-plus'
+import { ElButton, ElDialog, ElImageViewer, ElRadio, ElRadioGroup } from 'element-plus'
 
 interface ProductDetail extends GoodsInfo {
   images?: string[]
@@ -60,6 +60,14 @@ const deletingLoading = ref(false)
 // 操作 loading 状态（防止重复提交）
 const collectingLoading = ref(false)
 const buyingLoading = ref(false)
+const checkoutVisible = ref(false)
+const checkoutTradeType = ref<0 | 1>(0)
+const formatMoney = (value: number) => Number(value || 0).toFixed(2)
+const checkoutDeliveryFee = computed(() => checkoutTradeType.value === 0 ? 0 : Number(product.value?.deliveryFee || 0))
+const checkoutTotal = computed(() => {
+  if (!product.value) return 0
+  return (Math.round(Number(product.value.price) * 100) + Math.round(checkoutDeliveryFee.value * 100)) / 100
+})
 
 // 相似商品推荐
 const similarProducts = ref<RecommendItemVO[]>([])
@@ -343,7 +351,7 @@ const handleLike = async () => {
 }
 
 // 购买商品
-const handleBuy = async () => {
+const handleBuy = () => {
   if (isOrderReadonlyView.value) {
     ElMessage.info('该商品已存在订单记录，请在“我的订单”中继续处理')
     return
@@ -357,16 +365,23 @@ const handleBuy = async () => {
     ElMessage.warning('为保障交易安全，请先完成校园认证')
     return
   }
-  if (!product.value || buyingLoading.value) return
+  if (!product.value || buyingLoading.value || checkoutVisible.value) return
 
   if (product.value.tradeStatus !== TradeStatus.ON_SALE) {
     ElMessage.warning('商品已售出或已下架')
     return
   }
 
+  checkoutTradeType.value = product.value.tradeType === 1 ? 1 : 0
+  checkoutVisible.value = true
+}
+
+const handleConfirmBuy = async () => {
+  if (!checkoutVisible.value || !product.value || buyingLoading.value) return
   buyingLoading.value = true
   try {
-    await createOrder({ productId: productId.value, remark: '' })
+    await createOrder({ productId: productId.value, tradeType: checkoutTradeType.value, remark: '' })
+    checkoutVisible.value = false
     ElMessage.success('下单成功')
     await router.push('/profile/my-orders?type=buy')
   } catch {
@@ -491,6 +506,7 @@ watch(
   () => productId.value,
   async (newId, oldId) => {
     if (!Number.isFinite(newId) || newId <= 0 || newId === oldId) return
+    checkoutVisible.value = false
     const previousCategoryId = product.value?.categoryId
     await recordView(oldId, previousCategoryId)
     await fetchProductDetail()
@@ -937,7 +953,7 @@ onUnmounted(() => {
               isReviewPassed(product.reviewStatus)
             "
             @click="handleBuy"
-            :disabled="buyingLoading"
+            :disabled="buyingLoading || checkoutVisible"
             class="flex-[2] bg-warm-600 hover:bg-warm-700 text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg shadow-warm-200 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {{ buyingLoading ? '下单中...' : '立即下单' }}
@@ -952,6 +968,40 @@ onUnmounted(() => {
         </template>
       </div>
     </div>
+
+    <ElDialog
+      v-model="checkoutVisible"
+      title="确认订单"
+      width="min(560px, calc(100vw - 32px))"
+      :close-on-click-modal="!buyingLoading"
+      :close-on-press-escape="!buyingLoading"
+      :show-close="!buyingLoading"
+      destroy-on-close
+    >
+      <div v-if="product" class="space-y-4">
+        <p class="font-semibold text-slate-900 break-words">{{ product.title }}</p>
+        <dl class="space-y-3 text-sm">
+          <div class="flex justify-between gap-4"><dt class="text-slate-500">卖家</dt><dd>{{ product.sellerName || '卖家' }}</dd></div>
+          <div class="flex justify-between gap-4"><dt class="text-slate-500">卖家提供的交付方式</dt><dd>{{ tradeTypeText }}</dd></div>
+          <div v-if="product.tradeType === 2" class="flex items-center justify-between gap-4">
+            <dt class="text-slate-500">本次交付方式</dt>
+            <dd><ElRadioGroup v-model="checkoutTradeType" :disabled="buyingLoading" aria-label="本次交付方式"><ElRadio :value="0">校内面交</ElRadio><ElRadio :value="1">快递邮寄</ElRadio></ElRadioGroup></dd>
+          </div>
+          <div class="flex justify-between gap-4"><dt class="text-slate-500">商品金额</dt><dd>¥{{ formatMoney(product.price) }}</dd></div>
+          <div class="flex justify-between gap-4"><dt class="text-slate-500">运费{{ checkoutTradeType === 0 ? '（面交免运费）' : '' }}</dt><dd>¥{{ formatMoney(checkoutDeliveryFee) }}</dd></div>
+          <div class="flex justify-between gap-4 border-t border-slate-200 pt-3 font-bold"><dt>订单总额</dt><dd class="text-warm-600">¥{{ formatMoney(checkoutTotal) }}</dd></div>
+        </dl>
+        <div class="rounded-xl bg-slate-50 p-3 text-xs leading-6 text-slate-600">
+          <p v-if="checkoutTradeType === 0">仅支持同学校交易。请通过站内消息约定校内公共地点，实际交付并验货后再确认验收。</p>
+          <p v-else>仅支持同学校交易。邮寄前请通过站内消息与卖家确认收件信息和寄送安排，当前暂不提供站内物流追踪。</p>
+          <p>当前使用站内余额，暂未接入在线充值或第三方支付。提交订单后不会立即扣款，可在“我的订单”付款或取消待付款订单。</p>
+        </div>
+      </div>
+      <template #footer>
+        <ElButton :disabled="buyingLoading" @click="checkoutVisible = false">返回修改</ElButton>
+        <ElButton type="primary" :loading="buyingLoading" @click="handleConfirmBuy">确认下单</ElButton>
+      </template>
+    </ElDialog>
 
     <ElImageViewer
       v-if="showImagePreview && productImages.length"

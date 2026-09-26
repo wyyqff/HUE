@@ -14,6 +14,7 @@ import com.unimarket.common.mq.GoodsSyncMessage;
 import com.unimarket.common.result.PageResult;
 import com.unimarket.common.result.ResultCode;
 import com.unimarket.common.utils.RedisCache;
+import com.unimarket.common.utils.MoneyValidator;
 import com.unimarket.module.goods.dto.GoodsPublishDTO;
 import com.unimarket.module.goods.dto.GoodsQueryDTO;
 import com.unimarket.module.goods.entity.CollectionRecord;
@@ -284,6 +285,7 @@ public class GoodsServiceImpl implements GoodsService {
                 .rawPayload(rawPayload)
                 .build());
 
+        validatePublishAmounts(dto);
         // 创建商品
         GoodsInfo goodsInfo = BeanUtil.copyProperties(dto, GoodsInfo.class);
         goodsInfo.setSellerId(userId);
@@ -325,8 +327,9 @@ public class GoodsServiceImpl implements GoodsService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void update(Long userId, Long productId, GoodsPublishDTO dto) {
+        validatePublishAmounts(dto);
         // 查询商品
-        GoodsInfo goodsInfo = goodsInfoMapper.selectById(productId);
+        GoodsInfo goodsInfo = goodsInfoMapper.selectByIdForUpdate(productId);
         if (goodsInfo == null) {
             throw new BusinessException(ResultCode.GOODS_NOT_FOUND);
         }
@@ -382,7 +385,7 @@ public class GoodsServiceImpl implements GoodsService {
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long userId, Long productId) {
         // 查询商品
-        GoodsInfo goodsInfo = goodsInfoMapper.selectById(productId);
+        GoodsInfo goodsInfo = goodsInfoMapper.selectByIdForUpdate(productId);
         if (goodsInfo == null) {
             throw new BusinessException("商品不存在");
         }
@@ -431,7 +434,7 @@ public class GoodsServiceImpl implements GoodsService {
     @Transactional(rollbackFor = Exception.class)
     public void offshelf(Long userId, Long productId) {
         // 查询商品
-        GoodsInfo goodsInfo = goodsInfoMapper.selectById(productId);
+        GoodsInfo goodsInfo = goodsInfoMapper.selectByIdForUpdate(productId);
         if (goodsInfo == null) {
             throw new BusinessException("商品不存在");
         }
@@ -492,8 +495,7 @@ public class GoodsServiceImpl implements GoodsService {
         collectionRecordMapper.insert(record);
 
         // 更新商品收藏数
-        goodsInfo.setCollectCount(goodsInfo.getCollectCount() + 1);
-        goodsInfoMapper.updateById(goodsInfo);
+        goodsInfoMapper.adjustCollectCount(productId, 1);
         notifyGoodsSearchUpdated(productId, "收藏");
 
     }
@@ -514,10 +516,7 @@ public class GoodsServiceImpl implements GoodsService {
         collectionRecordMapper.deleteById(record.getCollectionId());
 
         // 更新商品收藏数
-        GoodsInfo goodsInfo = goodsInfoMapper.selectById(productId);
-        if (goodsInfo != null && goodsInfo.getCollectCount() > 0) {
-            goodsInfo.setCollectCount(goodsInfo.getCollectCount() - 1);
-            goodsInfoMapper.updateById(goodsInfo);
+        if (goodsInfoMapper.adjustCollectCount(productId, -1) > 0) {
             notifyGoodsSearchUpdated(productId, "取消收藏");
         }
 
@@ -767,5 +766,15 @@ public class GoodsServiceImpl implements GoodsService {
                 .ne(OrderInfo::getOrderStatus, OrderStatus.CANCELLED.getCode());
         Long count = orderInfoMapper.selectCount(orderWrapper);
         return count != null && count > 0;
+    }
+
+    private void validatePublishAmounts(GoodsPublishDTO dto) {
+        MoneyValidator.requireValid(dto.getPrice(), false, "商品价格");
+        if (dto.getDeliveryFee() != null) {
+            MoneyValidator.requireValid(dto.getDeliveryFee(), true, "运费");
+        }
+        if (dto.getOriginalPrice() != null) {
+            MoneyValidator.requireValid(dto.getOriginalPrice(), true, "商品原价");
+        }
     }
 }

@@ -17,6 +17,10 @@ import java.math.BigDecimal;
 @Mapper
 public interface OrderInfoMapper extends BaseMapper<OrderInfo> {
 
+    /** Current read; held until transaction completion, including Redis lock release windows. */
+    @Select("SELECT * FROM order_info WHERE order_id = #{orderId} FOR UPDATE")
+    OrderInfo selectByIdForUpdate(@Param("orderId") Long orderId);
+
     /**
      * 统计完成订单的总金额
      * @param status 订单状态

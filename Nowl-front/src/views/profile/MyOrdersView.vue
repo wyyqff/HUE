@@ -115,8 +115,16 @@ const orderStatusMap: Record<number, { text: string; color: string; icon: typeof
   },
 }
 
-const getStatusMeta = (status: number) =>
-  orderStatusMap[status] || { text: '未知状态', color: 'bg-slate-100 text-slate-500', icon: Clock }
+const isPostalOrder = (order: OrderInfo) => order.tradeType === 1
+const deliveryActionText = (order: OrderInfo) => isPostalOrder(order) ? '确认发货' : '确认交付'
+const receiveActionText = (order: OrderInfo) => isPostalOrder(order) ? '确认收货' : '确认验收'
+const formatMoney = (value?: number | null) => Number(value || 0).toFixed(2)
+const getStatusMeta = (order: OrderInfo) => {
+  const meta = orderStatusMap[order.orderStatus] || { text: '未知状态', color: 'bg-slate-100 text-slate-500', icon: Clock }
+  if (!isPostalOrder(order) && order.orderStatus === OrderStatus.PENDING_DELIVERY) return { ...meta, text: '待交付' }
+  if (!isPostalOrder(order) && order.orderStatus === OrderStatus.PENDING_RECEIVE) return { ...meta, text: '待验收' }
+  return meta
+}
 
 const getRefundMeta = (status?: number) => {
   if (status === undefined || status === null) return null
@@ -298,7 +306,10 @@ const canPayOrder = (order: OrderInfo) =>
   isBuyerPerspective(order) && order.orderStatus === OrderStatus.PENDING_PAY
 
 const canDeliverOrder = (order: OrderInfo) =>
-  isSellerPerspective(order) && order.orderStatus === OrderStatus.PENDING_DELIVERY
+  isSellerPerspective(order)
+  && order.orderStatus === OrderStatus.PENDING_DELIVERY
+  && !isRefundPending(order)
+  && !hasActiveDispute(order)
 
 const canConfirmOrder = (order: OrderInfo) =>
   isBuyerPerspective(order)
@@ -312,36 +323,62 @@ const canCancelOrder = (order: OrderInfo) =>
 const canProcessRefund = (order: OrderInfo) =>
   isSellerPerspective(order) && isRefundPending(order)
 
-const handlePay = (order: OrderInfo) => {
+const handlePay = async (order: OrderInfo) => {
   if (!canPayOrder(order)) {
     ElMessage.warning('当前订单状态不可支付')
     return
   }
-  void handleOrderAction(order.orderId, '确认支付该订单？', payOrder, '支付成功')
+  if (isOrderActionPending(order.orderId)) return
+  markOrderActionPending(order.orderId)
+  try {
+    const currentUser = await userStore.fetchUserInfo()
+    const balance = Number(currentUser.money || 0)
+    const amount = Number(order.totalAmount)
+    if (!Number.isFinite(amount) || amount <= 0) {
+      ElMessage.error('订单金额无效，请刷新订单后重试')
+      return
+    }
+    if (!Number.isFinite(balance) || balance < amount) {
+      ElMessage.warning(`站内余额不足：当前 ¥${formatMoney(balance)}，订单需 ¥${formatMoney(amount)}。暂未接入在线充值或第三方支付，可取消待付款订单。`)
+      return
+    }
+    await ElMessageBox.confirm(`将从站内余额扣除 ¥${formatMoney(amount)}，当前可用 ¥${formatMoney(balance)}。确认余额付款？`, '余额付款', {
+      confirmButtonText: '确认付款',
+      cancelButtonText: '暂不付款',
+    })
+    await payOrder(order.orderId)
+    ElMessage.success('余额付款成功')
+    void refresh()
+    void userStore.fetchUserInfo().catch(() => undefined)
+  } catch (error) {
+    if (error !== 'cancel') ElMessage.error('付款未完成，请检查订单状态和余额后重试')
+  } finally {
+    clearOrderActionPending(order.orderId)
+  }
 }
 
 const handleDeliver = (order: OrderInfo) => {
   if (!canDeliverOrder(order)) {
-    ElMessage.warning('当前订单状态不可发货')
+    ElMessage.warning('当前订单不可交付，请先处理退款或交易争议')
     return
   }
-  void handleOrderAction(order.orderId, '确认已发货？', deliverOrder, '发货成功')
+  void handleOrderAction(order.orderId, isPostalOrder(order) ? '确认已经寄出商品？' : '请仅在商品已实际交给买家后确认交付。确认已交付？', deliverOrder, isPostalOrder(order) ? '已确认发货' : '已确认交付')
 }
 
 const handleConfirm = (order: OrderInfo) => {
   if (isRefundPending(order)) {
-    ElMessage.warning('订单退款处理中，暂不可确认收货')
+    ElMessage.warning('订单退款处理中，暂不可确认验收')
     return
   }
   if (hasActiveDispute(order)) {
-    ElMessage.warning('订单存在进行中纠纷，暂不可确认收货')
+    ElMessage.warning('订单存在进行中纠纷，暂不可确认验收')
     return
   }
   if (!canConfirmOrder(order)) {
-    ElMessage.warning('当前订单状态不可确认收货')
+    ElMessage.warning('当前订单状态不可确认验收')
     return
   }
-  void handleOrderAction(order.orderId, '确认收货？', confirmOrder, '确认收货成功')
+  void handleOrderAction(order.orderId, '请确认已收到商品并完成验货。确认后订单将完成，款项将结算给卖家。', confirmOrder, `${receiveActionText(order)}成功`)
 }
 
 const handleCancel = (order: OrderInfo) => {
@@ -374,12 +411,12 @@ const handleApplyRefund = async (order: OrderInfo) => {
         confirmButtonText: '提交申请',
         cancelButtonText: '取消',
         inputPlaceholder: '例如：卖家长期未发货 / 商品问题等',
-        inputValidator: val => !!val || '退款原因不能为空',
+        inputValidator: val => (val.trim().length > 0 && val.trim().length <= 255) || '请填写1至255字的退款原因',
       },
     )
 
     await applyRefund(order.orderId, {
-      reason,
+      reason: reason.trim(),
       amount: Number(order.totalAmount || 0),
     })
     ElMessage.success('退款申请已提交')
@@ -402,7 +439,10 @@ const handleProcessRefund = async (order: OrderInfo, action: 'approve' | 'reject
     ElMessage.warning('当前订单状态不可处理退款')
     return
   }
-  const confirmText = action === 'approve' ? '确认同意退款？' : '确认拒绝退款？'
+  const refundAmount = formatMoney(order.refundAmount ?? order.totalAmount)
+  const confirmText = action === 'approve'
+    ? `确认同意退款 ¥${refundAmount}？款项将退回买家站内余额，订单将关闭。已交付的商品请先与买家确认退回安排。`
+    : `确认拒绝退款 ¥${refundAmount}？买家可继续发起交易争议。`
   const successText = action === 'approve' ? '已同意退款' : '已拒绝退款'
 
   markOrderActionPending(order.orderId)
@@ -440,7 +480,7 @@ const goToDispute = (order: OrderInfo) => {
     return
   }
   if (!canRaiseDispute(order)) {
-    ElMessage.warning('仅支持待确认收货订单发起纠纷')
+    ElMessage.warning('仅支持待验收订单，或待交付且退款被拒绝的订单发起纠纷')
     return
   }
   router.push(`/dispute/create?type=0&id=${order.orderId}`)
@@ -589,7 +629,8 @@ const getDisplayDisputeId = (order: OrderInfo) => {
 
 const canRaiseDispute = (order: OrderInfo) =>
   isBuyerPerspective(order)
-  && order.orderStatus === OrderStatus.PENDING_RECEIVE
+  && (order.orderStatus === OrderStatus.PENDING_RECEIVE
+    || (order.orderStatus === OrderStatus.PENDING_DELIVERY && getRefundStatus(order) === 3))
   && !isRefundPending(order)
   && !hasActiveDispute(order)
 
@@ -659,7 +700,7 @@ onMounted(() => {
               <div class="text-sm font-bold">{{ orderStats.pending }}</div>
             </div>
             <div class="rounded-xl bg-blue-50 border border-blue-100 px-3 py-2 text-blue-700">
-              <div class="text-[11px] text-blue-500">运输中</div>
+              <div class="text-[11px] text-blue-500">交付中</div>
               <div class="text-sm font-bold">{{ orderStats.shipping }}</div>
             </div>
             <div class="rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-2 text-emerald-700">
@@ -673,6 +714,7 @@ onMounted(() => {
           <ShieldAlert :size="14" />
           当前有 {{ orderStats.refunding }} 笔退款处理中
         </p>
+        <p class="mt-3 text-xs leading-5 text-slate-500">当前使用站内余额付款，暂未接入在线充值或第三方支付。余额不足时，可取消待付款订单。</p>
       </section>
 
       <div v-if="showInitialLoading" class="text-center py-12">
@@ -693,12 +735,12 @@ onMounted(() => {
         >
           <header class="flex items-start justify-between gap-3 pb-3 border-b border-slate-100">
             <div class="min-w-0">
-              <p class="text-xs text-slate-400">订单号 {{ order.orderId }}</p>
+              <p class="text-xs text-slate-400">订单号 {{ order.orderNo || order.orderId }}</p>
               <p class="text-xs text-slate-400 mt-1">{{ formatTime(order.createTime) }}</p>
             </div>
-            <div class="px-3 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1" :class="getStatusMeta(order.orderStatus).color">
-              <component :is="getStatusMeta(order.orderStatus).icon" :size="13" />
-              {{ getStatusMeta(order.orderStatus).text }}
+            <div class="px-3 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1" :class="getStatusMeta(order).color">
+              <component :is="getStatusMeta(order).icon" :size="13" />
+              {{ getStatusMeta(order).text }}
             </div>
           </header>
 
@@ -721,10 +763,12 @@ onMounted(() => {
                 <p class="text-slate-600 inline-flex items-center gap-1">
                   <CircleDollarSign :size="14" class="text-slate-400" />
                   交易金额：
-                  <span class="font-bold text-warm-600">¥{{ order.totalAmount }}</span>
+                  <span class="font-bold text-warm-600">¥{{ formatMoney(order.totalAmount) }}</span>
                 </p>
+                <p class="text-xs text-slate-500">商品 ¥{{ formatMoney(order.orderAmount) }} + 运费 ¥{{ formatMoney(order.deliveryFee) }}</p>
+                <p v-if="order.tradeType === 0 || order.tradeType === 1" class="text-xs text-slate-500">交付方式：{{ isPostalOrder(order) ? '快递邮寄' : '校内面交' }}</p>
                 <p v-if="order.deliveryTime" class="text-xs text-slate-500">
-                  发货时间：{{ formatTime(order.deliveryTime) }}
+                  {{ isPostalOrder(order) ? '发货时间' : '交付时间' }}：{{ formatTime(order.deliveryTime) }}
                 </p>
                 <p v-if="order.remark" class="text-xs text-slate-500">备注：{{ order.remark }}</p>
               </div>
@@ -738,14 +782,14 @@ onMounted(() => {
                   退款：{{ formatRefundBadgeText(order) }}
                 </span>
                 <span
-                  v-if="order.orderStatus === OrderStatus.PENDING_RECEIVE && order.deliveryTime"
+                  v-if="order.orderStatus === OrderStatus.PENDING_RECEIVE && order.deliveryTime && !isRefundPending(order) && !hasActiveDispute(order)"
                   class="text-[11px] rounded-full px-2.5 py-1 bg-orange-50 text-orange-600 inline-flex items-center gap-1"
                 >
                   <Timer :size="12" />
                   {{ getAutoConfirmCountdown(order.deliveryTime) }}
                 </span>
                 <span
-                  v-if="isRefundPending(order) && order.refundDeadline"
+                  v-if="isRefundPending(order) && order.orderStatus === OrderStatus.PENDING_DELIVERY && order.refundDeadline"
                   class="text-[11px] rounded-full px-2.5 py-1 bg-red-50 text-red-600 inline-flex items-center gap-1"
                 >
                   <Clock :size="12" />
@@ -758,6 +802,14 @@ onMounted(() => {
                   <ShieldAlert :size="12" />
                   纠纷处理中
                 </span>
+              </div>
+              <div v-if="getRefundStatus(order) !== null && getRefundStatus(order) !== 0" class="mt-3 rounded-xl bg-orange-50 p-3 text-xs leading-6 text-slate-600">
+                <p class="break-words">退款原因：{{ order.refundReason || '未提供' }}</p>
+                <p>{{ isRefundPending(order) ? '待退金额' : '申请退款金额' }}：¥{{ formatMoney(order.refundAmount ?? order.totalAmount) }}</p>
+                <p v-if="order.refundApplyTime">申请时间：{{ formatTime(order.refundApplyTime) }}</p>
+                <p v-if="isRefundPending(order) && order.orderStatus === OrderStatus.PENDING_DELIVERY && order.refundDeadline">处理截止：{{ formatTime(order.refundDeadline) }}</p>
+                <p v-if="isRefundPending(order) && order.orderStatus === OrderStatus.PENDING_RECEIVE">已交付订单请先协商退货，由卖家确认退款或提交平台处理，不会超时自动退款。</p>
+                <p v-if="isRefundPending(order)" class="text-orange-700">退款处理中，已暂停交付、验收及自动确认。</p>
               </div>
               <button
                 v-if="!hasActiveDispute(order) && hasLatestClosedDispute(order) && latestClosedDisputeText(order)"
@@ -776,28 +828,31 @@ onMounted(() => {
             <button
               v-if="canPayOrder(order)"
               @click="handlePay(order)"
+              :disabled="isOrderActionPending(order.orderId)"
               class="um-btn px-3.5 py-2 text-sm bg-warm-500 text-white hover:bg-warm-600"
             >
               <span class="inline-flex items-center gap-1">
                 <CreditCard :size="14" />
-                立即支付
+                余额付款
               </span>
             </button>
 
             <button
               v-if="canDeliverOrder(order)"
               @click="handleDeliver(order)"
+              :disabled="isOrderActionPending(order.orderId)"
               class="um-btn px-3.5 py-2 text-sm bg-warm-500 text-white hover:bg-warm-600"
             >
-              立即发货
+              {{ deliveryActionText(order) }}
             </button>
 
             <button
               v-if="canConfirmOrder(order)"
               @click="handleConfirm(order)"
+              :disabled="isOrderActionPending(order.orderId)"
               class="um-btn px-3.5 py-2 text-sm bg-emerald-500 text-white hover:bg-emerald-600"
             >
-              确认收货
+              {{ receiveActionText(order) }}
             </button>
 
             <button

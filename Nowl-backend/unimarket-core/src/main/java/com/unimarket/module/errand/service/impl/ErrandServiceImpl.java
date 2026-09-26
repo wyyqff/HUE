@@ -117,14 +117,10 @@ public class ErrandServiceImpl implements ErrandService {
 
         ErrandTask task = BeanUtil.copyProperties(dto, ErrandTask.class);
 
-        // 检查余额
-        if (user.getMoney().compareTo(task.getReward()) < 0) {
+        // 条件扣款由数据库检查最新余额，避免跨任务并发覆盖扣款。
+        if (userInfoMapper.debitBalance(userId, task.getReward()) != 1) {
             throw new BusinessException("余额不足，无法发布悬赏任务");
         }
-
-        // 扣除余额（资金托管）
-        user.setMoney(user.getMoney().subtract(task.getReward()));
-        userInfoMapper.updateById(user);
         task.setPublisherId(userId);
         task.setTaskStatus(ErrandStatus.PENDING.getCode());
         task.setSchoolCode(dto.getSchoolCode());
@@ -221,7 +217,7 @@ public class ErrandServiceImpl implements ErrandService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateErrand(Long userId, Long taskId, ErrandPublishDTO dto) {
-        ErrandTask task = errandTaskMapper.selectById(taskId);
+        ErrandTask task = errandTaskMapper.selectByIdForUpdate(taskId);
         if (task == null) {
             throw new BusinessException("任务不存在");
         }
@@ -249,15 +245,14 @@ public class ErrandServiceImpl implements ErrandService {
         int cmp = newReward.compareTo(escrowedReward);
         if (cmp > 0) {
             java.math.BigDecimal diff = newReward.subtract(escrowedReward);
-            if (publisher.getMoney().compareTo(diff) < 0) {
+            if (userInfoMapper.debitBalance(userId, diff) != 1) {
                 throw new BusinessException("余额不足，无法提高悬赏金额");
             }
-            publisher.setMoney(publisher.getMoney().subtract(diff));
-            userInfoMapper.updateById(publisher);
         } else if (cmp < 0) {
             java.math.BigDecimal diff = escrowedReward.subtract(newReward);
-            publisher.setMoney(publisher.getMoney().add(diff));
-            userInfoMapper.updateById(publisher);
+            if (userInfoMapper.creditBalance(userId, diff) != 1) {
+                throw new BusinessException("退还悬赏差额失败，请稍后重试");
+            }
         }
 
         task.setTitle(dto.getTitle());
@@ -319,7 +314,7 @@ public class ErrandServiceImpl implements ErrandService {
                 throw new BusinessException(ResultCode.USER_NOT_FOUND);
             }
 
-            ErrandTask task = errandTaskMapper.selectById(taskId);
+            ErrandTask task = errandTaskMapper.selectByIdForUpdate(taskId);
             if (task == null) {
                 throw new BusinessException("任务不存在");
             }
@@ -404,7 +399,7 @@ public class ErrandServiceImpl implements ErrandService {
                 throw new BusinessException("系统繁忙，请稍后重试");
             }
 
-            ErrandTask task = errandTaskMapper.selectById(taskId);
+            ErrandTask task = errandTaskMapper.selectByIdForUpdate(taskId);
             if (task == null) {
                 throw new BusinessException("任务不存在");
             }
@@ -467,7 +462,7 @@ public class ErrandServiceImpl implements ErrandService {
                 throw new BusinessException("系统繁忙，请稍后重试");
             }
 
-            ErrandTask task = errandTaskMapper.selectById(taskId);
+            ErrandTask task = errandTaskMapper.selectByIdForUpdate(taskId);
             if (task == null) {
                 throw new BusinessException("任务不存在");
             }
@@ -482,10 +477,8 @@ public class ErrandServiceImpl implements ErrandService {
             }
 
             // 结算佣金给接单人
-            UserInfo acceptor = userInfoMapper.selectById(task.getAcceptorId());
-            if (acceptor != null) {
-                acceptor.setMoney(acceptor.getMoney().add(task.getReward()));
-                userInfoMapper.updateById(acceptor);
+            if (userInfoMapper.creditBalance(task.getAcceptorId(), task.getReward()) != 1) {
+                throw new BusinessException("接单人账户不存在或佣金结算失败");
             }
 
             // 更新状态为已完成
@@ -528,7 +521,7 @@ public class ErrandServiceImpl implements ErrandService {
                 throw new BusinessException("系统繁忙，请稍后重试");
             }
 
-            ErrandTask task = errandTaskMapper.selectById(taskId);
+            ErrandTask task = errandTaskMapper.selectByIdForUpdate(taskId);
             if (task == null) {
                 throw new BusinessException("任务不存在");
             }
@@ -583,10 +576,8 @@ public class ErrandServiceImpl implements ErrandService {
             }
 
             // 退还佣金给发布者
-            UserInfo publisher = userInfoMapper.selectById(task.getPublisherId());
-            if (publisher != null) {
-                publisher.setMoney(publisher.getMoney().add(task.getReward()));
-                userInfoMapper.updateById(publisher);
+            if (userInfoMapper.creditBalance(task.getPublisherId(), task.getReward()) != 1) {
+                throw new BusinessException("发布者账户不存在或佣金退款失败");
             }
 
             String normalizedReason = reason == null ? "" : reason.trim();

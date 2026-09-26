@@ -96,6 +96,9 @@ public class OrderVO {
      */
     private BigDecimal deliveryFee;
 
+    /** 实际交付方式快照：0-面交，1-邮寄；历史订单可能为空。 */
+    private Integer tradeType;
+
     /**
      * 总金额
      */

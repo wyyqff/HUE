@@ -82,4 +82,27 @@ class OrderPermissionServiceTest {
 
         assertFalse(orderPermissionService.canApplyDispute(13L, 1L));
     }
+
+    @Test
+    void rejectedRefundBeforeDeliveryOnlyAllowsBuyerAppeal() {
+        OrderInfo order = new OrderInfo();
+        order.setBuyerId(1L);
+        order.setSellerId(2L);
+        order.setOrderStatus(OrderStatus.PENDING_DELIVERY.getCode());
+        order.setRefundStatus(RefundStatus.REJECTED.getCode());
+        when(orderInfoMapper.selectById(14L)).thenReturn(order);
+        assertTrue(orderPermissionService.canApplyDispute(14L, 1L));
+        assertFalse(orderPermissionService.canApplyDispute(14L, 2L));
+        assertFalse(orderPermissionService.canConfirm(14L, 1L));
+    }
+
+    @Test
+    void pendingRefundPreventsSellerDelivery() {
+        OrderInfo order = new OrderInfo();
+        order.setSellerId(2L);
+        order.setOrderStatus(OrderStatus.PENDING_DELIVERY.getCode());
+        order.setRefundStatus(RefundStatus.PENDING.getCode());
+        when(orderInfoMapper.selectById(15L)).thenReturn(order);
+        assertFalse(orderPermissionService.canDeliver(15L, 2L));
+    }
 }

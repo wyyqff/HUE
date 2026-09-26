@@ -99,7 +99,9 @@ public class OrderPermissionService {
             return false;
         }
         return order.getSellerId().equals(userId)
-                && OrderStatus.PENDING_DELIVERY.getCode().equals(order.getOrderStatus());
+                && OrderStatus.PENDING_DELIVERY.getCode().equals(order.getOrderStatus())
+                && !RefundStatus.PENDING.getCode().equals(order.getRefundStatus())
+                && !hasActiveOrderDispute(orderId);
     }
 
     /**
@@ -189,7 +191,7 @@ public class OrderPermissionService {
     /**
      * 订单参与者是否可发起纠纷
      * - 必须是买家/卖家
-     * - 仅待确认收货订单可发起（资金仍在平台托管）
+     * - 待确认收货订单可发起；待交付退款被拒绝时买家也可申诉
      * - 退款处理中不可发起（避免纠纷与退款并行）
      * - 同一订单存在进行中纠纷时禁止重复发起
      */
@@ -205,7 +207,10 @@ public class OrderPermissionService {
         if (!isParticipant) {
             return false;
         }
-        if (!OrderStatus.PENDING_RECEIVE.getCode().equals(order.getOrderStatus())) {
+        boolean rejectedBeforeDelivery = userId.equals(order.getBuyerId())
+                && OrderStatus.PENDING_DELIVERY.getCode().equals(order.getOrderStatus())
+                && RefundStatus.REJECTED.getCode().equals(order.getRefundStatus());
+        if (!OrderStatus.PENDING_RECEIVE.getCode().equals(order.getOrderStatus()) && !rejectedBeforeDelivery) {
             return false;
         }
         if (RefundStatus.PENDING.getCode().equals(order.getRefundStatus())) {

@@ -58,7 +58,7 @@ public class AdminGoodsDomainService {
     }
 
     private void doAuditGoods(Long operatorId, Long goodsId, Integer status, String reason) {
-        GoodsInfo goods = goodsInfoMapper.selectById(goodsId);
+        GoodsInfo goods = goodsInfoMapper.selectByIdForUpdate(goodsId);
         if (goods == null) {
             throw new BusinessException(ResultCode.PARAM_IS_INVALID);
         }
@@ -127,7 +127,7 @@ public class AdminGoodsDomainService {
 
     @Transactional(rollbackFor = Exception.class)
     public void forceOfflineGoods(Long operatorId, Long goodsId, String reason) {
-        GoodsInfo goods = goodsInfoMapper.selectById(goodsId);
+        GoodsInfo goods = goodsInfoMapper.selectByIdForUpdate(goodsId);
         if (goods == null) {
             throw new BusinessException("商品不存在");
         }

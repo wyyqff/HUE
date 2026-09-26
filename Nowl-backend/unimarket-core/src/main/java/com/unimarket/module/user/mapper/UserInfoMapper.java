@@ -6,11 +6,25 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Update;
 
+import java.math.BigDecimal;
+
 /**
  * UserInfo Mapper接口
  */
 @Mapper
 public interface UserInfoMapper extends BaseMapper<UserInfo> {
+
+    /** 原子扣款；余额不足、账户不存在或金额非正数时返回 0。 */
+    @Update("UPDATE user_info SET money = money - #{amount}, update_time = NOW() " +
+            "WHERE user_id = #{userId} AND #{amount} > 0 " +
+            "AND #{amount} = ROUND(CAST(#{amount} AS DECIMAL(65,30)), 2) AND money >= #{amount}")
+    int debitBalance(@Param("userId") Long userId, @Param("amount") BigDecimal amount);
+
+    /** 原子入账；账户不存在或金额非正数时返回 0。 */
+    @Update("UPDATE user_info SET money = money + #{amount}, update_time = NOW() " +
+            "WHERE user_id = #{userId} AND #{amount} > 0 " +
+            "AND #{amount} = ROUND(CAST(#{amount} AS DECIMAL(65,30)), 2)")
+    int creditBalance(@Param("userId") Long userId, @Param("amount") BigDecimal amount);
 
     /**
      * 原子更新用户信用分
